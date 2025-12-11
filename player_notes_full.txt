@@ -1,0 +1,256 @@
+Arena Quest — Game Design Document (GDD)
+Version : Décembre 2025 — Auteur : Dylan Eglantine
+
+0. Introduction
+
+Arena Quest est un RPG arène/donjon en JavaScript natif orienté combat, progression, loot et optimisation du personnage.
+Le jeu repose sur des mécaniques inspirées des RPG classiques (Diablo, Dofus, Shakes & Fidget) avec :
+combats tour par tour,
+loot aléatoire avec raretés,
+donjons à salles déterministes,
+système d’XP, montée de niveau, scaling ennemi,
+boutique & économie interne,
+équipements, inventaire & familiers.
+Ce document précise toutes les mécaniques actuelles, les formules et les systèmes, dans un format GDD professionnel.
+
+1. Systèmes de Jeu
+
+1.1 Boucle de Gameplay principale
+
+Le joueur entre dans l’arène → génération d’une rencontre :
+
+1–3 ennemis via newEncounter().
+
+Les combats sont tour par tour.
+Chaque attaque suit la formule :
+dégâts = max(1, player.damage − enemy.defense) (post-esquive, post-critique).
+Lorsqu’un ennemi meurt :
+gain d’XP
+gain de gold
+test de drop d’item selon rareté
+À la fin d’un combat :
+endCombatCleanup() réinitialise le state
+la liste des ennemis est vidée.
+
+2. Progression — XP, Niveaux, Stats
+
+2.1 XP requise
+
+xpToNextLevel(lvl) = max(20, 100 * lvl)
+
+2.2 Level-up
+
+Lors d’une montée de niveau :
+PV max : +10 + floor(newLevel × 1.5)
+Dégâts de base : +2 + floor(newLevel / 10)
+Défense de base : +1 + floor(newLevel / 15)
+→ Puis recalcStatsFromEquipment() applique les bonus des items.
+
+2.3 Plafond de niveau
+
+MAX_LEVEL = 80
+Au niveau 80 :
+plus de montée possible
+XP automatiquement plafonnée
+message : "Niveau maximum atteint (80)."
+
+3. Système d’XP — Formule complète
+
+3.1 Formule appliquée
+
+baseXp = randInt(6,16)
+levelFactor = 1 + (enemy.level / 10)
+rarityMult :
+  common = 1
+  rare = 1.5
+  epic = 2
+  legendary = 3
+  mythic = 6
+xpGain = max(1, floor(baseXp * levelFactor * rarityMult))
+
+Exemple
+Ennemi épique, niveau 20
+levelFactor = 3.0
+rarityMult = 2
+Total = 6× multiplication
+→ XP ≈ baseXp * 6
+
+4. Donjons
+
+4.1 Génération
+
+Donjons composés de multi-salles.
+Basés sur un seed déterministe → mêmes salles pour une même graine.
+Stockage : currentDungeon.rooms.
+
+4.2 Évolutions possibles
+
+persistance HP ennemis dans le donjon (instances)
+ajustement dynamique de difficulté (tier scaling)
+
+5. Ennemis
+
+5.1 Paliers d’ennemis (ENEMY_TIERS)
+Rareté	Niveau	Exemple	Notes
+Common	1–5	Gobelin, Slime	Très fréquent
+Rare	6–15	Brigand, Ogre	Menace modérée
+Epic	16–30	Golem, Wyrm	Résistants
+Legendary	31–59	Seigneur du Fléau	Durs
+Mythic	60+	Boss mythiques	Très rares
+
+5.2 Scalings
+
+HP ≈ 20 + lvl^1.35 × (6..9)
+DMG ≈ lvl × (0.8..2.0)
+DEF ≈ lvl × (0.5..1.1)
+
+5.3 Esquive & critiques
+
+systèmes pour joueur & ennemis
+crit multiplier ≈ 1.5
+
+6. Économie
+
+6.1 Gains lors d’un kill
+
+Gold : randInt(4,14)
+XP : via la formule détaillée ci-dessus
+
+6.2 Boutique
+
+Potions : 20 gold
+Equipements : ITEMS[id].cost
+Vente :
+sellPrice = max(1, floor(cost * 0.5))
+
+7. Items & Équipements
+
+7.1 Structure
+
+Chaque item contient :
+id
+name
+rarity
+type
+dmg / def / dodge / hp / crit
+heal (optionnel)
+cost
+stats auto via applyAutoStatsToItems()
+
+7.2 Emplacements
+
+Arme
+Armure
+Ceinture
+Botte
+Coiffe
+Anneau
+Familliers (nouveau)
+
+7.3 Calcul des stats
+
+recalcStatsFromEquipment() :
+additionne dégats, défenses, HP bonus, critique, esquive
+applique les valeurs dans le Player Object
+
+8. Taux de drop
+
+8.1 RARITY_DROP_RATES
+
+Rareté	Probabilité par kill
+Common	30%
+Rare	12%
+Epic	8%
+Legendary	1%
+Mythic	0.2%
+
+8.2 Processus
+
+Roll global sur totalDrop
+Sélection de la rareté proportionnelle
+Sélection d’un item dans DROPPABLE_ITEMS
+
+9. Boutique — Rotation horaire
+
+Basée sur getHourSeedIndex()
+Affiche 3 équipements premium par heure
+Affichage du type et des stats inline
+
+10. Sauvegarde / Persistance
+
+10.1 Sauvegarde
+
+Stockée dans :
+localStorage["tpgame_player_v1"]
+
+Contient :
+stats
+inventaire
+équipements
+gold
+XP & niveau
+familiers équipés
+salle de donjon en cours
+
+11. Familiers (Nouvelle Mécanique)
+
+11.1 Fonctionnement
+
+Ajout d’un slot familliers
+stats :
+famAttack (attaque automatique après le joueur)
+def (bonus de défense)
+affichées et appliquées via recalcStatsFromEquipment()
+
+11.2 Combat
+
+Après que le joueur frappe :
+Si player.familiarAttack > 0, l’animal attaque automatiquement :
+Exemple :
+🐾 Dragon familier inflige 6 dégâts à Gobelin #1.
+Si le familier tue l’ennemi → récompenses normales
+
+11.3 Familiers implémentés
+
+ID	Nom	Rareté	famAttack	DEF	Coût
+pet_dragon	Dragon familier	Epic	6	2	800
+pet_dog	Chien fidèle	Rare	2	1	120
+
+11.4 Tests rapides
+
+Console :
+player.inventory.push({ id: 'pet_dragon', name: 'Dragon familier', rarity: 'epic' });
+updateStats();
+
+12. Interface & Mobile
+
+Inventaire adapté pour mobile
+Tap → déséquiper
+UI responsive
+Shop amélioré : tooltips + stats inline
+
+13. Améliorations Techniques récentes
+
+Ajout champs hp, dodge, crit sur les items
+Esquives + critiques pour joueur & ennemis
+Suppression scaling ennemi dépendant joueur
+Donjons déterministes (seed)
+Nettoyage affichage des items (type, stats, tooltip)
+
+14. Options futures / Backlog
+
+Persistance HP ennemis dans donjons
+Ajustement multiplicateurs ennemis
+Style CSS dédié aux stats items
+Boss uniques par palier
+Forge / crafting
+Système d’éléments (feu, glace, poison)
+Compétences actives (skills)
+Familiers avancés (évolutions, leveling)
+Multi / WebSocket
+Transitions & particules
+IA ennemie (patrouille, aggro)
+
+15. Annexes
+
+→ Possibilité : génération d’un fichier CSV des taux exacts de drop par item.

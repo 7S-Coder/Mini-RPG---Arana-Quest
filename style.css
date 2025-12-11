@@ -335,3 +335,11 @@ body{
   .shop, #catalog, .modal { max-height: calc(100vh - 120px); }
 }
 
+/* Item comparison block shown inside tooltips */
+.item-compare{margin-top:8px;border-top:1px dashed rgba(255,255,255,0.04);padding-top:6px;font-size:0.86rem}
+.item-compare .tt-name{font-weight:700;color:#fff;margin-bottom:6px}
+.item-compare .tt-row{display:flex;justify-content:space-between;padding:2px 0}
+.item-compare .value.stat-up{color:#8fe08f}
+.item-compare .value.stat-down{color:#ff9a9a}
+.item-compare .delta{color:#bfb8a9;margin-left:6px;font-size:0.85em}
+

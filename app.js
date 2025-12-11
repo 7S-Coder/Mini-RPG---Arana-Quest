@@ -173,6 +173,11 @@ const ENEMY_TIERS = {
     mythic:    { weight: 2,  levelMin: 60, levelMax: 100, color: '#ff4d4d', glow: true, glowColor: 'rgba(255,80,80,0.95)' }
 };
 
+// Global multiplier to scale enemy stats (easy tuning knob)
+const ENEMY_GLOBAL_POWER = 1.5; // 1.5 => 1.5x HP/DMG/DEF
+// Multiplier for enemy combat stats (dodge / crit)
+const ENEMY_STAT_MULTIPLIER = 1.5; // 1.5 => 1.5x ESQ and CRIT
+
 // Global name pools extracted so maps can include them in their own enemy pools
 const GLOBAL_ENEMY_POOLS = {
     common: ['Gobelin','Slime','Loup','Rôdeur','Squelette','Bouftou'],
@@ -373,16 +378,30 @@ function createEnemyFromTier(tier, index) {
     const names = GLOBAL_ENEMY_POOLS[tier] || GLOBAL_ENEMY_POOLS.common;
     const baseName = names[Math.floor(Math.random() * names.length)];
     const name = `${baseName} #${index+1}`;
-    // HP/défense/dégâts scaling: non-linéaire pour rendre les niveaux supérieurs significativement plus dangereux
-    const hp = Math.floor(20 + Math.pow(level, 1.35) * (6 + Math.random() * 3));
-    const dmg = Math.max(1, Math.floor(level * (0.8 + Math.random() * 1.2)));
-    const def = Math.floor(level * (0.5 + Math.random() * 0.6));
-    const e = new Enemy(name, hp, dmg);
-    e.maxHp = hp;
+    // HP/défense/dégâts scaling: stronger non-linéaire growth
+    let hp = Math.floor(22 + Math.pow(level, 1.4) * (7 + Math.random() * 4));
+    let dmg = Math.max(1, Math.floor(level * (1.0 + Math.random() * 1.6)));
+    let def = Math.floor(level * (0.7 + Math.random() * 0.8));
+    // Apply a player-independent multiplier based on how the enemy's level compares
+    // to the average level for its tier. This keeps monsters consistent for all players.
+    const avgTierLevel = Math.max(1, Math.floor((cfg.levelMin + cfg.levelMax) / 2));
+    const lvlRatio = level / avgTierLevel;
+    const tierMul = { common: 1, rare: 1.08, epic: 1.18, legendary: 1.35, mythic: 1.7 }[tier] || 1;
+    let extraMul = 1.0;
+    if (lvlRatio >= 2) extraMul = 1.75;
+    else if (lvlRatio >= 1.5) extraMul = 1.3;
+    // apply multipliers (deterministic, not using player state)
+    const finalHp = Math.max(1, Math.floor(hp * extraMul * tierMul * ENEMY_GLOBAL_POWER));
+    const finalDmg = Math.max(1, Math.floor(dmg * extraMul * tierMul * ENEMY_GLOBAL_POWER));
+    const finalDef = Math.max(0, Math.floor(def * extraMul * tierMul * ENEMY_GLOBAL_POWER));
+
+    let e = new Enemy(name, finalHp, finalDmg);
+    e.maxHp = finalHp;
+    e.hp = finalHp;
     e.level = level;
     e.tier = tier;
-    e.defense = def;
-    // compute enemy dodge/crit based on level and tier
+    e.defense = finalDef;
+    // compute enemy dodge/crit based on level and tier (deterministic)
     const stats = computeEnemyCombatStats(level, tier);
     e.dodge = stats.dodge;
     e.crit = stats.crit;
@@ -393,10 +412,34 @@ function createEnemyFromTier(tier, index) {
 function computeEnemyCombatStats(level, tier) {
     const tierBonus = { common: 0, rare: 1, epic: 2, legendary: 4, mythic: 8 };
     const bonus = tierBonus[tier] || 0;
-    // Dodge grows slowly with level + tier bonus
-    const dodge = Math.min(35, Math.floor(level * 0.25) + bonus);
-    // Crit is smaller, grows with level and tier
-    const crit = Math.min(25, Math.floor(level * 0.12) + Math.floor(bonus * 0.8));
+    // Base dodge/crit from level and tier
+    let dodge = Math.floor(level * 0.30) + bonus; // slightly higher base
+    let crit = Math.floor(level * 0.14) + Math.floor(bonus * 0.9);
+    // If enemy is a true elite relative to player, boost their evasiveness and crit chance
+    try {
+        if (typeof player !== 'undefined' && player && player.lvl) {
+            const playerLvl = Math.max(1, player.lvl || 1);
+            if (level >= playerLvl * 2) {
+                dodge += 10; // significant evasiveness
+                crit += 5;   // higher crit chance
+            } else if (level >= Math.ceil(playerLvl * 1.5)) {
+                dodge += 4;
+                crit += 2;
+            }
+        }
+    } catch (e) { /* ignore */ }
+    // apply global stat multiplier (e.g., triple ESQ/CRIT)
+    try {
+        const mult = (typeof ENEMY_STAT_MULTIPLIER === 'number' && ENEMY_STAT_MULTIPLIER > 0) ? ENEMY_STAT_MULTIPLIER : 1;
+        dodge = Math.floor(dodge * mult);
+        crit = Math.floor(crit * mult);
+        // caps scaled with multiplier
+        dodge = Math.min(60 * mult, dodge);
+        crit = Math.min(40 * mult, crit);
+    } catch (e) {
+        dodge = Math.min(60, dodge);
+        crit = Math.min(40, crit);
+    }
     return { dodge, crit };
 }
 
@@ -411,14 +454,26 @@ function createMapEnemy(mapId, index) {
     const name = `${def.name} #${(index||0)+1}`;
     const hp = def.baseHp || Math.max(12, 18 + Math.floor(Math.random()*12));
     const dmg = def.damage || Math.max(1, Math.floor(hp/8));
-    const e = new Enemy(name, Math.floor(hp), Math.floor(dmg));
+    let e = new Enemy(name, Math.floor(hp), Math.floor(dmg));
     e.maxHp = Math.floor(hp);
     e.hp = Math.floor(hp);
     e.level = (ENEMY_TIERS[def.tier] && ENEMY_TIERS[def.tier].levelMin) ? Math.floor(Math.random() * (ENEMY_TIERS[def.tier].levelMax - ENEMY_TIERS[def.tier].levelMin + 1)) + ENEMY_TIERS[def.tier].levelMin : 1;
     e.tier = def.tier || 'common';
     e.defense = def.defense || def.def || 0;
     e.originMap = mapId;
-    // enemy combat stats
+    // Apply deterministic multipliers based on enemy level vs its tier average
+    const tierCfg = ENEMY_TIERS[e.tier] || { levelMin: 1, levelMax: 1 };
+    const avgTierLevel = Math.max(1, Math.floor((tierCfg.levelMin + tierCfg.levelMax) / 2));
+    const lvlRatio = e.level / avgTierLevel;
+    const tierMul = { common: 1, rare: 1.08, epic: 1.18, legendary: 1.35, mythic: 1.7 }[e.tier] || 1;
+    let extraMul = 1.0;
+    if (lvlRatio >= 2) extraMul = 1.75;
+    else if (lvlRatio >= 1.5) extraMul = 1.3;
+    e.maxHp = Math.max(1, Math.floor(e.maxHp * extraMul * tierMul * ENEMY_GLOBAL_POWER));
+    e.hp = e.maxHp;
+    e.damage = Math.max(1, Math.floor((e.damage || dmg) * extraMul * tierMul * ENEMY_GLOBAL_POWER));
+    e.defense = Math.max(0, Math.floor((e.defense || 0) * extraMul * tierMul * ENEMY_GLOBAL_POWER));
+    // enemy combat stats (deterministic)
     const stats = computeEnemyCombatStats(e.level, e.tier);
     e.dodge = stats.dodge;
     e.crit = stats.crit;
@@ -1154,7 +1209,7 @@ function renderShop() {
     const potionTooltip = getItemTooltipHTML('potion');
     const potionSimpleType = getSimpleType(ITEMS['potion']);
     const potionTypeLabel = potionSimpleType ? ` <span class="item-type">(${potionSimpleType})</span>` : '';
-    let html = `<div class="shop-item"><span style="${pStyle}">Potion de soin${potionTypeLabel}</span> ${potionTooltip} — 20g <button data-action="buy" data-id="potion">Acheter</button></div>`;
+    let html = `<div class="shop-item" data-item-id="potion"><span style="${pStyle}">Potion de soin${potionTypeLabel}</span> ${potionTooltip} — 20g <button data-action="buy" data-id="potion">Acheter</button></div>`;
     // rotating equipments
     const rot = getRotatingShopItems();
     html += `<div style="margin-top:8px;font-weight:700">Équipements en boutique (rotation horaire)</div>`;
@@ -1168,7 +1223,7 @@ function renderShop() {
         const stats = getItemStatsSummary(def);
         const simpleType = getSimpleType(def);
         const typeLabel = simpleType ? ` <span class="item-type">(${simpleType})</span>` : '';
-        html += `<div class="shop-item"><span style="${style}">${def.name}${typeLabel} ${stats}</span> ${tooltip} — ${def.rarity} — ${def.cost || 'N/A'}g <button data-action="buy" data-id="${id}">Acheter</button></div>`;
+        html += `<div class="shop-item" data-item-id="${id}"><span style="${style}">${def.name}${typeLabel} ${stats}</span> ${tooltip} — ${def.rarity} — ${def.cost || 'N/A'}g <button data-action="buy" data-id="${id}">Acheter</button></div>`;
     });
     // include a close control for modal behavior
     shopEl.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><strong>Magasin</strong><button id="closeShop" class="btn">Fermer</button></div>${html}`;
@@ -1231,7 +1286,7 @@ function updateInventory() {
         const glow = getGlowStyle(r);
         const style = `color:${r.color};${glow}`;
         const tooltip = getItemTooltipHTML(id);
-        return `<div class="${cls}" data-slot="${slot}" role="button" tabindex="0"><div class="slot-name">${slotLabels[slot]}</div><div class="slot-item" style="${style}">${def.name}${tooltip}</div><button onclick="unequipSlot('${slot}')">Déséquiper</button></div>`;
+        return `<div class="${cls}" data-slot="${slot}" data-item-id="${id}" role="button" tabindex="0"><div class="slot-name">${slotLabels[slot]}</div><div class="slot-item" style="${style}">${def.name}${tooltip}</div><button onclick="unequipSlot('${slot}')">Déséquiper</button></div>`;
     }).join('');
 
     // render inventory items
@@ -1250,7 +1305,7 @@ function updateInventory() {
         const useBtn = def.heal ? ` <button onclick="useItem(${i})">Utiliser</button>` : '';
         const sellBtn = `<button onclick="sellItem(${i})">Vendre (${getSellPrice(id)}g)</button>`;
         const tooltip = getItemTooltipHTML(id);
-        return `<div class="inv-item" style="${style}"><div>${def.name}${tooltip}</div><div>${equipBtn}${useBtn}${sellBtn}</div></div>`;
+        return `<div class="inv-item" data-item-id="${id}" style="${style}"><div>${def.name}${tooltip}</div><div>${equipBtn}${useBtn}${sellBtn}</div></div>`;
     }).join('');
 
     // Attach mobile-friendly handlers: single tap on equip slot unequips (only for touch/mobile sizes)
@@ -1300,7 +1355,7 @@ function renderDroppableCatalog() {
         const pct = (rate * 100).toFixed(3).replace(/\.000$/, '');
         const rateLabel = ` <span class="drop-rate">Taux de drop: ${pct}%</span>`;
         const tooltip = getItemTooltipHTML(key);
-        return `<div class="catalog-item"><strong style="${style}">${it.name} ${stats}</strong> ${typeLabel} — <em>${it.rarity}</em> ${extra}${rateLabel}${tooltip}</div>`;
+        return `<div class="catalog-item" data-item-id="${key}"><strong style="${style}">${it.name} ${stats}</strong> ${typeLabel} — <em>${it.rarity}</em> ${extra}${rateLabel}${tooltip}</div>`;
     }).join('');
     el.innerHTML = `<div class="catalog-head"><h3>Catalogue des drops</h3><button id="closeCatalog" class="btn">Fermer</button></div>${html}`;
     // wire close button
@@ -1525,6 +1580,9 @@ if (closeInvBtn && invModal) {
     });
 }
 
+// Initialize hover / touch comparison handlers (delayed to ensure DOM elements exist)
+setTimeout(() => { try { setupItemCompareHover(); } catch(e) { console.warn('setupItemCompareHover init failed', e); } }, 200);
+
 // Simplify types to the requested set: arme, botte, ceinture, amulette, anneau, plastron, chapeau, artefact
 function getSimpleType(def) {
     const t = (def.type || '').toString().toLowerCase();
@@ -1589,7 +1647,7 @@ function applyAutoStatsToItems() {
 
 
 // Returns tooltip HTML for an item key (used inside .inv-item, .shop-item, .catalog-item)
-function getItemTooltipHTML(key) {
+function getItemTooltipHTML(key, compareHtml) {
     const it = ITEMS[key] || {};
     const parts = [];
     if (it.name) parts.push(`<div class="tt-name">${it.name}</div>`);
@@ -1633,7 +1691,9 @@ function getItemTooltipHTML(key) {
     if (it.rarity) parts.push(`<div class="tt-row"><div class="label">Rareté</div><div class="value">${it.rarity}</div></div>`);
     if (it.desc) parts.push(`<div class="tt-row"><div class="label">Info</div><div class="value">${it.desc}</div></div>`);
     if (parts.length === 0) return '';
-    return `<div class="item-tooltip">${parts.join('')}</div>`;
+    const base = `<div class="item-tooltip">${parts.join('')}`;
+    const cmp = compareHtml ? `<div class="item-compare">${compareHtml}</div>` : '';
+    return `${base}${cmp}</div>`;
 }
 
 // Return a short inline stats summary for display in lists (catalog/shop/inventory)
@@ -1655,6 +1715,114 @@ function getItemStatsSummary(it) {
     if (it.crit !== undefined) parts.push(`CRIT ${fmt(it.crit)}%`);
     if (parts.length === 0) return '';
     return `<span class="item-stats-inline">(${parts.join(' | ')})</span>`;
+}
+
+// Compare two items (hovered vs equipped) and return HTML rows showing deltas
+function compareItemStats(hoverId) {
+    try {
+        const hover = ITEMS[hoverId] || null;
+        if (!hover) return '';
+        const slot = getSimpleType(hover) || 'artefact';
+        const equippedId = player.equipment[slot] || null;
+        const equip = equippedId ? (ITEMS[equippedId] || null) : null;
+
+        const stats = ['dmg','def','hp','dodge','crit','famAttack'];
+        const rows = [];
+        rows.push(`<div class="tt-name">Comparatif (${slot})</div>`);
+        stats.forEach(s => {
+            const hVal = getStatValue(hover, s);
+            const eVal = getStatValue(equip, s);
+            // normalize names for label
+            let label = s.toUpperCase();
+            if (s === 'dmg') label = 'DMG';
+            if (s === 'def') label = 'DEF';
+            if (s === 'hp') label = 'PV';
+            if (s === 'dodge') label = 'Esquive';
+            if (s === 'crit') label = 'Crit';
+            if (s === 'famAttack') label = 'Attaques (fam.)';
+            // compute delta
+            const delta = (hVal || 0) - (eVal || 0);
+            if (hVal === 0 && eVal === 0) return; // skip irrelevant stats
+            const cls = delta > 0 ? 'stat-up' : (delta < 0 ? 'stat-down' : '');
+            const displayH = formatStatValue(s, hVal);
+            const displayDelta = delta === 0 ? '±0' : (delta > 0 ? `+${formatStatValue(s, delta)}` : `${formatStatValue(s, delta)}`);
+            rows.push(`<div class="tt-row compare-row"><div class="label">${label}</div><div class="value ${cls}">${displayH} <span class="delta">(${displayDelta})</span></div></div>`);
+        });
+        return rows.join('');
+    } catch (e) { return ''; }
+}
+
+function getStatValue(it, stat) {
+    if (!it) return 0;
+    if (stat === 'hp') {
+        if (it.hp !== undefined) {
+            if (typeof it.hp === 'number') return it.hp;
+            if (Array.isArray(it.hp)) return it.hp[0] || 0;
+            if (typeof it.hp === 'object' && it.hp.value !== undefined) return it.hp.value;
+        }
+        if (it.pv !== undefined) return (typeof it.pv === 'number') ? it.pv : (Array.isArray(it.pv) ? it.pv[0] : 0);
+        return 0;
+    }
+    return (typeof it[stat] === 'number') ? it[stat] : 0;
+}
+
+function formatStatValue(stat, v) {
+    if (stat === 'dodge' || stat === 'crit') return `${v}%`;
+    return `${v}`;
+}
+
+// Setup event delegation for hover/touch comparison in shop/catalog/inventory
+function setupItemCompareHover() {
+    try {
+        const attachTo = [];
+        const shop = document.getElementById('shop'); if (shop) attachTo.push(shop);
+        const catalog = document.getElementById('catalog'); if (catalog) attachTo.push(catalog);
+        const inv = document.getElementById('inventory'); if (inv) attachTo.push(inv);
+        const equip = document.querySelector('.equipment-slots'); if (equip) attachTo.push(equip);
+
+        attachTo.forEach(container => {
+            // mouseover: show comparison in existing tooltip
+            container.addEventListener('mouseover', (ev) => {
+                const itemEl = ev.target.closest('[data-item-id]');
+                if (!itemEl) return;
+                const id = itemEl.dataset.itemId;
+                if (!id) return;
+                const tooltip = itemEl.querySelector('.item-tooltip');
+                if (!tooltip) return;
+                // only add if not already present
+                if (tooltip.querySelector('.item-compare')) return;
+                const cmp = compareItemStats(id);
+                if (!cmp) return;
+                const wrapper = document.createElement('div');
+                wrapper.className = 'item-compare';
+                wrapper.innerHTML = cmp;
+                tooltip.appendChild(wrapper);
+            });
+            // mouseout: remove comparison block
+            container.addEventListener('mouseout', (ev) => {
+                const itemEl = ev.target.closest('[data-item-id]');
+                if (!itemEl) return;
+                const tooltip = itemEl.querySelector('.item-tooltip');
+                if (!tooltip) return;
+                const cmp = tooltip.querySelector('.item-compare');
+                if (cmp) cmp.remove();
+            });
+            // touch/click: toggle comparison for mobile (useful when tooltips disabled)
+            container.addEventListener('click', (ev) => {
+                const itemEl = ev.target.closest('[data-item-id]');
+                if (!itemEl) return;
+                const id = itemEl.dataset.itemId;
+                if (!id) return;
+                const tooltip = itemEl.querySelector('.item-tooltip');
+                if (!tooltip) return;
+                const cmp = tooltip.querySelector('.item-compare');
+                if (cmp) { cmp.remove(); return; }
+                const html = compareItemStats(id);
+                if (!html) return;
+                const wrapper = document.createElement('div'); wrapper.className='item-compare'; wrapper.innerHTML = html; tooltip.appendChild(wrapper);
+            }, { passive: true });
+        });
+    } catch (e) { console.warn('setupItemCompareHover failed', e); }
 }
 
 // load saved player if present (before first save in updateStats)
