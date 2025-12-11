@@ -38,6 +38,19 @@ body{
 .stats{white-space:pre-line;font-size:0.85rem;color:#e6e1d9}
 .inventory{font-size:0.85rem;color:#cfc6b7;margin-top:8px}
 
+/* Equipment and inventory UI */
+.equipment-panel{margin-top:10px}
+.equipment{display:flex;flex-wrap:wrap;gap:8px}
+.equip-slot{min-width:64px;min-height:64px;border-radius:8px;background:rgba(255,255,255,0.02);display:flex;align-items:center;justify-content:center;flex-direction:column;padding:6px;border:1px solid rgba(255,255,255,0.03)}
+.equip-slot .slot-name{font-size:0.7rem;color:#bfb8a9}
+.equip-slot .slot-item{font-size:0.8rem;color:#fff;margin-top:4px}
+.inventory-panel{margin-top:10px}
+.inventory-list{display:flex;flex-wrap:wrap;gap:8px}
+.inv-item{padding:6px 8px;border-radius:8px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.02);display:flex;align-items:center;gap:8px}
+.inv-item button{padding:4px 6px;border-radius:6px;font-size:0.75rem}
+.catalog-item{padding:8px;border-radius:8px;margin-bottom:6px;background:rgba(255,255,255,0.01);border:1px solid rgba(255,255,255,0.02)}
+.drop-rate{font-size:0.8rem;color:#c9d6c3;margin-left:8px}
+
 .arena .arena-top{display:flex;gap:8px;align-items:center;justify-content:space-between}
 .enemy-info{font-size:0.9rem;color:#f0d9c1}
 
@@ -73,6 +86,25 @@ body{
 
 .shop{display:none;margin-top:10px;display:flex;flex-direction:column;gap:8px}
 .shopItem,.shop-item{padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);color:var(--muted);border:1px solid rgba(255,255,255,0.02)}
+
+/* Tier legend */
+.tier-legend{margin-top:12px;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.02)}
+.tier-legend h4{margin:0 0 6px 0;font-size:0.85rem;color:#e9e6da}
+.tier-items{display:flex;flex-direction:column;gap:6px}
+.tier-item{display:flex;align-items:center;gap:8px;font-size:0.85rem}
+.tier-item .swatch{width:18px;height:12px;border-radius:4px;border:1px solid rgba(255,255,255,0.04)}
+.tier-item .tier-name{min-width:80px;color:#dcd6c8}
+.tier-item .tier-range{color:#bfb8a9;font-size:0.8rem}
+
+/* Enemy cards */
+.enemy-cards{display:flex;flex-direction:column;gap:8px}
+.enemy-card{padding:10px;border-radius:10px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.03);display:flex;flex-direction:column;gap:6px}
+.enemy-card .ec-head{display:flex;justify-content:space-between;align-items:center}
+.enemy-card .ec-name{font-weight:700}
+.enemy-card .ec-meta{font-size:0.82rem;color:#cfc6b7}
+.enemy-card .ec-stats{display:flex;gap:12px;font-size:0.9rem;color:#e6e1d9}
+.enemy-card .ec-stats .stat{padding:4px 6px;border-radius:6px;background:rgba(0,0,0,0.12)}
+.enemy-card[data-dead="true"]{opacity:0.5}
 
 .site-footer{text-align:center;color:#777;font-size:0.75rem;margin-top:12px}
 

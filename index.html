@@ -27,7 +27,14 @@
                 </div>
             </div>
             <p id="playerStats" class="stats"></p>
-            <p id="inventory" class="inventory"></p>
+            <div id="equipmentPanel" class="equipment-panel">
+                <h3>Équipement</h3>
+                <div id="equipment" class="equipment"></div>
+            </div>
+            <div id="inventoryPanel" class="inventory-panel">
+                <h3>Inventaire</h3>
+                <div id="inventory" class="inventory-list"></div>
+            </div>
         </section>
 
         <section class="panel arena">
@@ -47,12 +54,12 @@
         <aside class="panel shopPanel">
             <button id="openShop" class="btn">Magasin</button>
             <button id="openCatalogBtn" class="btn">Catalogue</button>
-            <div id="shop" class="shop" aria-hidden="true">
-                <button data-item="sword" class="shop-item">Acheter Épée (20 or)</button>
-                <button data-item="shield" class="shop-item">Acheter Bouclier (15 or)</button>
-            </div>
+            <div id="shop" class="shop" aria-hidden="true"></div>
             <div id="catalog" class="shop" aria-hidden="true" style="display:none;">
                 <!-- contenu généré par JS -->
+            </div>
+            <div id="tierLegend" class="tier-legend">
+                <!-- Légende des paliers (générée par JS) -->
             </div>
         </aside>
     </main>

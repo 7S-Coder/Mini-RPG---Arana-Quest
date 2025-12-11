@@ -10,17 +10,42 @@ function log(t) {
     logEl.scrollTop = logEl.scrollHeight;
 }
 
+// Append an HTML log line (allows styled content)
+function logHTML(html) {
+    if (!logEl) return;
+    const line = document.createElement('div');
+    line.className = 'log-line';
+    line.innerHTML = html;
+    logEl.appendChild(line);
+    try { line.scrollIntoView({ behavior: 'auto', block: 'end' }); } catch(e) {}
+    logEl.scrollTop = logEl.scrollHeight;
+}
+
+
 class Player {
     constructor() {
         this.name = "Hero";
         this.hp = 100;
         this.maxHp = 100;
-        this.damage = 10;
-        this.defense = 5;
+        this.baseDamage = 10;
+        this.baseDefense = 5;
+        this.damage = this.baseDamage;
+        this.defense = this.baseDefense;
         this.xp = 0;
         this.lvl = 1;
         this.gold = 50;
         this.inventory = [];
+        // equipment slots: one slot per simplified type
+        this.equipment = {
+            arme: null,
+            botte: null,
+            ceinture: null,
+            amulette: null,
+            anneau: null,
+            plastron: null,
+            chapeau: null,
+            artefact: null
+        };
     }
 }
 
@@ -81,6 +106,56 @@ const ITEMS = {
     void_relic:    { id: 'void_relic', name: 'Relique du Vide', rarity: 'mythic', type: 'artefact', bonus: 'void', cost: 2500 },
     celestial_crown:{ id: 'celestial_crown', name: 'Couronne Céleste', rarity: 'mythic', type: 'chapeau', bonus: 'divine', cost: 3000 }
 };
+
+// Enemy tiers for difficulty scaling (levels and spawn weights)
+const ENEMY_TIERS = {
+    common:    { weight: 60, levelMin: 1,  levelMax: 5,   color: '#dddddd' },
+    rare:      { weight: 25, levelMin: 6,  levelMax: 15,  color: '#55aaff' },
+    epic:      { weight: 9,  levelMin: 16, levelMax: 30,  color: '#d46cff' },
+    legendary: { weight: 4,  levelMin: 31, levelMax: 59,  color: '#ffcc33' },
+    mythic:    { weight: 2,  levelMin: 60, levelMax: 100, color: '#ffd700', glow: true }
+};
+
+function sumWeights(obj) {
+    return Object.values(obj).reduce((s, v) => s + (v.weight || 0), 0);
+}
+
+function weightedPickEnemyTier() {
+    const total = sumWeights(ENEMY_TIERS);
+    const r = Math.random() * total;
+    let acc = 0;
+    for (const [k, v] of Object.entries(ENEMY_TIERS)) {
+        acc += v.weight;
+        if (r <= acc) return k;
+    }
+    return 'common';
+}
+
+function createEnemyFromTier(tier, index) {
+    const cfg = ENEMY_TIERS[tier] || ENEMY_TIERS.common;
+    const level = randInt(cfg.levelMin, cfg.levelMax);
+    // choose name pools per tier
+    const pools = {
+        common: ['Gobelin','Slime','Loup','Rôdeur','Squelette','Bouftou'],
+        rare: ['Brigand','Ogre','Warg','Garde','Satyre','Maraudeur'],
+        epic: ['Chasseur sombre','Golem','Wyrm','Nécromancien','Rôdeur ancien'],
+        legendary: ['Seigneur du Fléau','Géant de pierre','Drake','Chevalier noir'],
+        mythic: ['Ancien Primordial','Dragon Ancien','Titan','Démon Primordial']
+    };
+    const names = pools[tier] || pools.common;
+    const baseName = names[Math.floor(Math.random() * names.length)];
+    const name = `${baseName} #${index+1}`;
+    // HP/défense/dégâts scaling: non-linéaire pour rendre les niveaux supérieurs significativement plus dangereux
+    const hp = Math.floor(20 + Math.pow(level, 1.35) * (6 + Math.random() * 3));
+    const dmg = Math.max(1, Math.floor(level * (0.8 + Math.random() * 1.2)));
+    const def = Math.floor(level * (0.5 + Math.random() * 0.6));
+    const e = new Enemy(name, hp, dmg);
+    e.maxHp = hp;
+    e.level = level;
+    e.tier = tier;
+    e.defense = def;
+    return e;
+}
 
 // Catalogue des objets pouvant être dropés en jeu (utilisez les clés correspondant à `ITEMS`)
 const DROPPABLE_ITEMS = [
@@ -162,8 +237,59 @@ function useItem(index) {
 }
 window.useItem = useItem;
 
+// Equip an item from inventory into its slot (only 1 slot per type)
+function equipItem(index) {
+    const entry = player.inventory[index];
+    if (!entry) { log('ℹ️ Objet introuvable.'); return; }
+    const id = typeof entry === 'string' ? entry : entry.id;
+    const def = ITEMS[id] || null;
+    if (!def) { log('ℹ️ Objet inconnu, impossible d\'équiper.'); return; }
+    const slot = getSimpleType(def);
+    if (!slot) { log(`ℹ️ Cet objet ne peut pas être équipé.`); return; }
+    // if a different item is currently equipped in that slot, move it back to inventory
+    const currently = player.equipment[slot];
+    if (currently) {
+        player.inventory.push({ id: currently, name: ITEMS[currently]?.name ?? currently, rarity: ITEMS[currently]?.rarity ?? 'common' });
+    }
+    // equip
+    player.equipment[slot] = id;
+    // remove from inventory (remove first matching index)
+    player.inventory.splice(index, 1);
+    log(`⚙️ Vous équipez ${def.name} dans la slot ${slot}.`);
+    // apply immediate stat changes if relevant (simple approach)
+    // recalc player stats from base + equipment (simple additive)
+    recalcStatsFromEquipment();
+    updateStats();
+}
+window.equipItem = equipItem;
+
+function unequipSlot(slot) {
+    const cur = player.equipment[slot];
+    if (!cur) { log('ℹ️ Rien à déséquiper ici.'); return; }
+    player.inventory.push({ id: cur, name: ITEMS[cur]?.name ?? cur, rarity: ITEMS[cur]?.rarity ?? 'common' });
+    player.equipment[slot] = null;
+    log(`⚙️ Vous déséquipez ${ITEMS[cur]?.name ?? cur}.`);
+    recalcStatsFromEquipment();
+    updateStats();
+}
+window.unequipSlot = unequipSlot;
+
+// Recalculate player.damage and defense from base + equipment (naive additive)
+function recalcStatsFromEquipment() {
+    // start from base defaults (could store base values elsewhere)
+    player.damage = 10; // base
+    player.defense = 5; // base
+    Object.values(player.equipment).forEach(eid => {
+        if (!eid) return;
+        const def = ITEMS[eid];
+        if (!def) return;
+        if (def.dmg) player.damage += def.dmg;
+        if (def.def) player.defense += def.def;
+    });
+}
+
 const player = new Player();
-let currentEnemy = null;
+let currentEnemies = [];
 
 // LocalStorage key
 const STORAGE_KEY = 'tpgame_player_v1';
@@ -178,12 +304,15 @@ function savePlayer() {
             name: player.name,
             hp: player.hp,
             maxHp: player.maxHp,
+            baseDamage: player.baseDamage,
+            baseDefense: player.baseDefense,
             damage: player.damage,
             defense: player.defense,
             xp: player.xp,
             lvl: player.lvl,
             gold: player.gold,
-            inventory: player.inventory
+            inventory: player.inventory,
+            equipment: player.equipment
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     } catch (e) {
@@ -206,7 +335,17 @@ function loadPlayer() {
         player.xp = typeof data.xp === 'number' ? data.xp : player.xp;
         player.lvl = typeof data.lvl === 'number' ? data.lvl : player.lvl;
         player.gold = typeof data.gold === 'number' ? data.gold : player.gold;
+        player.baseDamage = typeof data.baseDamage === 'number' ? data.baseDamage : player.baseDamage;
+        player.baseDefense = typeof data.baseDefense === 'number' ? data.baseDefense : player.baseDefense;
+        player.damage = typeof data.damage === 'number' ? data.damage : player.damage;
+        player.defense = typeof data.defense === 'number' ? data.defense : player.defense;
         player.inventory = Array.isArray(data.inventory) ? data.inventory : player.inventory;
+        // restore equipment if present
+        if (data.equipment && typeof data.equipment === 'object') {
+            Object.keys(player.equipment).forEach(k => {
+                player.equipment[k] = data.equipment[k] ?? null;
+            });
+        }
     } catch (e) {
         console.warn('Impossible de charger le player depuis localStorage', e);
     }
@@ -233,37 +372,82 @@ function updateStats() {
 function renderEnemyInfo() {
     const el = document.getElementById('enemyInfo');
     if (!el) return;
-    if (!currentEnemy) {
-        el.textContent = '';
-    } else {
-        el.textContent = `${currentEnemy.name} — HP: ${currentEnemy.hp}`;
-    }
+        if (!currentEnemies || currentEnemies.length === 0) {
+            el.textContent = '';
+            return;
+        }
+        // render as cards
+        const html = currentEnemies.map((e, i) => {
+            const cfg = ENEMY_TIERS[e.tier] || {};
+            const color = cfg.color || '#fff';
+            const glow = cfg.glow ? 'text-shadow:0 0 8px rgba(255,215,0,0.9);' : '';
+            const dead = e.hp <= 0;
+            const name = `<span class="ec-name" style="color:${color};${glow}">${e.name}</span>`;
+            const meta = `<span class="ec-meta">${e.tier} — lvl ${e.level}</span>`;
+            const hpText = `${Math.max(0, e.hp)}${e.maxHp ? ` / ${e.maxHp}` : ''}`;
+            return `<div class="enemy-card" data-index="${i}" data-dead="${dead}"><div class="ec-head"><div>${name} ${meta}</div><div class="ec-hp">HP: ${hpText}</div></div><div class="ec-stats"><div class="stat ec-dmg">DMG: ${e.damage}</div><div class="stat ec-def">DEF: ${e.defense || 0}</div></div></div>`;
+        }).join('');
+        el.innerHTML = `<div class="enemy-cards">${html}</div>`;
 }
 
-function newEnemy() {
-    currentEnemy = new Enemy('Bouftou', 30 + Math.floor(Math.random() * 20), 5 + Math.floor(Math.random() * 4));
-    log(`🐺 ${currentEnemy.name} apparaît !`);
+// Render the tier legend into the sidebar
+function renderTierLegend() {
+    const el = document.getElementById('tierLegend');
+    if (!el) return;
+    const items = Object.entries(ENEMY_TIERS).map(([k, v]) => {
+        const color = v.color || '#fff';
+        const glow = v.glow ? 'box-shadow:0 0 8px rgba(255,215,0,0.8);' : '';
+        const range = v.levelMin && v.levelMax ? `lvl ${v.levelMin}-${v.levelMax}` : '';
+        return `<div class="tier-item"><span class="swatch" style="background:${color};${glow}"></span><span class="tier-name">${k}</span><span class="tier-range">${range}</span></div>`;
+    }).join('');
+    el.innerHTML = `<h4>Palier ennemis</h4><div class="tier-items">${items}</div>`;
+}
+
+// render legend on load
+renderTierLegend();
+
+function newEncounter() {
+    // spawn 1-3 enemies
+    const names = ['Bouftou','Gobelin','Loup','Slime','Squelette','Rôdeur'];
+    const count = Math.floor(Math.random() * 3) + 1; // 1..3
+    currentEnemies = [];
+    for (let i=0;i<count;i++) {
+        const tier = weightedPickEnemyTier();
+        const e = createEnemyFromTier(tier, i);
+        currentEnemies.push(e);
+        // styled appearance log using tier color
+        const cfg = ENEMY_TIERS[e.tier] || {};
+        const color = cfg.color || '#fff';
+        const glow = cfg.glow ? 'text-shadow:0 0 8px rgba(255,215,0,0.9);' : '';
+        const nameHtml = `<strong style="color:${color};${glow}">${e.name}</strong>`;
+        const tierHtml = `<em style="color:${color}">${e.tier}</em>`;
+        logHTML(`🐺 ${nameHtml} apparaît ! Niveau ${e.level} — Palier: ${tierHtml}`);
+    }
     updateStats();
 }
 
 document.getElementById('goToArena').addEventListener('click', () => {
-    newEnemy();
+    newEncounter();
 });
 
 document.getElementById('attackBtn').addEventListener('click', () => {
-    if (!currentEnemy) { log('ℹ️ Aucun ennemi présent. Allez à l\'arène !'); return; }
-    currentEnemy.hp -= player.damage;
-    log(`⚔️ Vous infligez ${player.damage} dégâts à ${currentEnemy.name}`);
-    if (currentEnemy.hp <= 0) {
-        // randomize rewards
-        const xpGain = randInt(6, 16); // example: 6-16 xp
-        const goldGain = randInt(4, 14); // example: 4-14 gold
-        log(`💀 ${currentEnemy.name} vaincu ! Vous gagnez ${xpGain} XP et ${goldGain} or.`);
+    if (!currentEnemies || currentEnemies.filter(e => e.hp > 0).length === 0) { log('ℹ️ Aucun ennemi présent. Allez à l\'arène !'); return; }
+    // target the first alive enemy
+    const targetIndex = currentEnemies.findIndex(e => e.hp > 0);
+    if (targetIndex === -1) { log('ℹ️ Aucun ennemi vivant.'); return; }
+    const target = currentEnemies[targetIndex];
+    const actualDamage = Math.max(1, player.damage - (target.defense || 0));
+    target.hp -= actualDamage;
+    log(`⚔️ Vous infligez ${actualDamage} dégâts à ${target.name} (def ${target.defense || 0})`);
+    if (target.hp <= 0) {
+        // reward for this kill
+        const xpGain = randInt(6, 16);
+        const goldGain = randInt(4, 14);
+        log(`💀 ${target.name} vaincu ! Vous gagnez ${xpGain} XP et ${goldGain} or.`);
         player.xp += xpGain; player.gold += goldGain;
         // decide drop by rarity probabilities
         const totalDrop = sumObjectValues(RARITY_DROP_RATES);
         if (Math.random() < totalDrop) {
-            // pick a rarity based on absolute rates
             const r = Math.random() * totalDrop;
             let acc = 0;
             let chosenRarity = null;
@@ -275,101 +459,194 @@ document.getElementById('attackBtn').addEventListener('click', () => {
             const dropped = pickItemByRarity(chosenRarity) || pickRandomItem();
             if (dropped) {
                 player.inventory.push({ id: dropped.id, name: dropped.name, rarity: dropped.rarity });
-                log(`🎁 ${currentEnemy.name} lâche : ${dropped.name} (${dropped.rarity})`);
+                log(`🎁 ${target.name} lâche : ${dropped.name} (${dropped.rarity})`);
             }
         }
-
-        // cleanup UI after victory
-        endCombatCleanup('victoire');
+        // remove dead enemy
+        currentEnemies.splice(targetIndex, 1);
+        if (!currentEnemies || currentEnemies.filter(e => e.hp > 0).length === 0) {
+            endCombatCleanup('victoire');
+            return;
+        }
+        updateStats();
         return;
     }
 
-    // Ennemi riposte
-    const edmg = Math.max(0, currentEnemy.damage - player.defense);
-    player.hp -= edmg;
-    log(`🛡️ ${currentEnemy.name} riposte et inflige ${edmg} dégâts.`);
-    if (player.hp <= 0) {
-        player.hp = 0;
-        log('☠️ Vous êtes mort. Rechargez la page pour recommencer.');
-        document.querySelectorAll('.btn').forEach(b => b.disabled = true);
+    // enemy retaliation: pick a random alive enemy to strike back
+    const alive = currentEnemies.filter(e => e.hp > 0);
+    if (alive.length > 0) {
+        const attacker = alive[Math.floor(Math.random() * alive.length)];
+        const edmg = Math.max(0, attacker.damage - player.defense);
+        player.hp -= edmg;
+        log(`🛡️ ${attacker.name} riposte et inflige ${edmg} dégâts.`);
+        if (player.hp <= 0) {
+            // Respawn: restore HP to max and end combat
+            player.hp = player.maxHp;
+            log('☠️ Vous êtes mort. Vous ressuscitez et récupérez vos PV au maximum.');
+            endCombatCleanup('mort');
+            return;
+        }
     }
     updateStats();
 });
 
 document.getElementById('runBtn').addEventListener('click', () => {
-    if (!currentEnemy) { log('ℹ️ Rien à fuir.'); return; }
+    if (!currentEnemies || currentEnemies.filter(e => e.hp > 0).length === 0) { log('ℹ️ Rien à fuir.'); return; }
     const chance = Math.random();
     if (chance > 0.45) {
         log('🏃 Vous réussissez à fuir !');
-        // cleanup UI after successful flee
         endCombatCleanup('fuite réussie');
     } else {
-        log('❌ Fuite échouée. L\'ennemi attaque.');
-        const edmg = Math.max(0, currentEnemy.damage - player.defense);
-        player.hp -= edmg;
-        if (player.hp <= 0) { player.hp = 0; log('☠️ Vous êtes mort.'); document.querySelectorAll('.btn').forEach(b => b.disabled = true); }
+        log('❌ Fuite échouée. Un ennemi attaque.');
+        const alive = currentEnemies.filter(e => e.hp > 0);
+        if (alive.length > 0) {
+            const attacker = alive[Math.floor(Math.random() * alive.length)];
+            const edmg = Math.max(0, attacker.damage - player.defense);
+            player.hp -= edmg;
+            if (player.hp <= 0) {
+                player.hp = player.maxHp;
+                log('☠️ Vous êtes mort. Vous ressuscitez et récupérez vos PV au maximum.');
+                endCombatCleanup('mort');
+                return;
+            }
+        }
     }
     updateStats();
 });
 
-// Shop logic (toggle + buy)
+// Shop logic (toggle + dynamic render)
 const shopEl = document.getElementById('shop');
 document.getElementById('openShop').addEventListener('click', () => {
     if (!shopEl) return;
+    // render/shop refresh when opening
+    renderShop();
     const shown = shopEl.style.display === 'flex';
     shopEl.style.display = shown ? 'none' : 'flex';
     shopEl.setAttribute('aria-hidden', shown ? 'true' : 'false');
 });
 
-const shopItems = {
-    sword:  { id: 'iron_sword', name: 'Épée', cost: 30 },
-    shield: { id: 'aegis_shield', name: 'Bouclier', cost: 220 },
-    potion: { id: 'potion', name: 'Potion', cost: 10 }
-};
+// Rotating expensive equipment pool (ids from ITEMS)
+const ROTATING_EQUIPMENTS = ['soulrender','aegis_plate','phoenix_feather','ring_of_eternity','dragon_blade','spectral_blade','stormcaller_staff','venom_bow','mythos_core','orb_of_ages','void_relic','celestial_crown'];
 
-document.querySelectorAll('#shop button').forEach(btn => {
-    btn.addEventListener('click', () => {
-        const key = btn.dataset.item;
-        const entry = shopItems[key];
-        if (!entry) return;
-        if (player.gold < entry.cost) { log("❌ Pas assez d'or !"); return; }
-        player.gold -= entry.cost;
-        // if entry references ITEMS, apply its stats
-        if (entry.id && ITEMS[entry.id]) {
-            const def = ITEMS[entry.id];
-            if (def.dmg) player.damage += def.dmg;
-            if (def.def) player.defense += def.def;
-            // store a lightweight object in inventory
-            player.inventory.push({ id: def.id, name: def.name, rarity: def.rarity });
-            log(`🛒 Vous achetez : ${def.name}`);
-        } else {
-            // fallback
-            player.inventory.push({ id: entry.name, name: entry.name, rarity: 'common' });
-            log(`🛒 Vous achetez : ${entry.name}`);
-        }
-        updateStats();
-        // save occurs in updateStats but ensure immediate persistence
-        savePlayer();
-    });
-});
+function getHourSeedIndex() {
+    const hours = Math.floor(Date.now() / 3600000); // hours since epoch
+    return hours % ROTATING_EQUIPMENTS.length;
+}
 
-function updateInventory() {
-    const el = document.getElementById('inventory');
-    if (!el) return;
-    if (!player.inventory || player.inventory.length === 0) {
-        el.textContent = 'Inventaire : vide';
-        return;
+function getRotatingShopItems() {
+    const start = getHourSeedIndex();
+    const out = [];
+    for (let i = 0; i < 3; i++) {
+        out.push(ROTATING_EQUIPMENTS[(start + i) % ROTATING_EQUIPMENTS.length]);
     }
-    el.innerHTML = 'Inventaire : ' + player.inventory.map((it, i) => {
-        if (typeof it === 'string') return `<span>${it}</span>`;
-        const def = ITEMS[it.id] || it;
-        const rarity = def.rarity || 'common';
-        const r = RARITIES[rarity] || { color: 'white' };
+    return out;
+}
+
+function getSellPrice(id) {
+    const def = ITEMS[id];
+    if (!def) return 1;
+    const cost = def.cost || 1;
+    return Math.max(1, Math.floor(cost * 0.5));
+}
+
+function sellItem(index) {
+    const it = player.inventory[index];
+    if (!it) { log('ℹ️ Rien à vendre à cet emplacement.'); return; }
+    const id = typeof it === 'string' ? it : it.id;
+    const price = getSellPrice(id);
+    player.inventory.splice(index, 1);
+    player.gold += price;
+    log(`💰 Vous vendez ${ITEMS[id]?.name ?? id} pour ${price} or.`);
+    updateStats();
+    savePlayer();
+}
+window.sellItem = sellItem;
+
+function renderShop() {
+    if (!shopEl) return;
+    // potion buy at fixed price 20g
+    const pR = RARITIES['common'] || { color: '#fff' };
+    const pGlow = pR.glow ? 'text-shadow:0 0 6px rgba(255,215,0,0.8);' : '';
+    const pStyle = `color:${pR.color};${pGlow}`;
+    let html = `<div class="shop-item"><span style="${pStyle}">Potion de soin</span> — 20g <button data-action="buy" data-id="potion">Acheter</button></div>`;
+    // rotating equipments
+    const rot = getRotatingShopItems();
+    html += `<div style="margin-top:8px;font-weight:700">Équipements en boutique (rotation horaire)</div>`;
+    rot.forEach(id => {
+        const def = ITEMS[id];
+        if (!def) return;
+        const r = RARITIES[def.rarity] || { color: '#fff' };
         const glow = r.glow ? 'text-shadow:0 0 6px rgba(255,215,0,0.8);' : '';
         const style = `color:${r.color};${glow}`;
+        html += `<div class="shop-item"><span style="${style}">${def.name}</span> — ${def.rarity} — ${def.cost || 'N/A'}g <button data-action="buy" data-id="${id}">Acheter</button></div>`;
+    });
+    shopEl.innerHTML = html;
+}
+
+// delegation for buy buttons
+if (shopEl) {
+    shopEl.addEventListener('click', (ev) => {
+        const btn = ev.target.closest('button[data-action="buy"]');
+        if (!btn) return;
+        const id = btn.dataset.id;
+        if (!id) return;
+        // price
+        if (id === 'potion') {
+            const cost = 20;
+            if (player.gold < cost) { log('❌ Pas assez d\'or pour acheter la potion.'); return; }
+            player.gold -= cost;
+            player.inventory.push({ id: 'potion', name: ITEMS['potion'].name, rarity: 'common' });
+            log(`🛒 Vous achetez une Potion pour ${cost} or.`);
+            updateStats(); savePlayer();
+            return;
+        }
+        const def = ITEMS[id];
+        if (!def) { log('ℹ️ Objet indisponible.'); return; }
+        const cost = def.cost || 0;
+        if (player.gold < cost) { log('❌ Pas assez d\'or pour cet objet.'); return; }
+        player.gold -= cost;
+        player.inventory.push({ id: def.id, name: def.name, rarity: def.rarity });
+        log(`🛒 Vous achetez ${def.name} pour ${cost} or.`);
+        updateStats(); savePlayer();
+    });
+}
+
+function updateInventory() {
+    const invEl = document.getElementById('inventory');
+    const equipEl = document.getElementById('equipment');
+    if (!invEl || !equipEl) return;
+
+    // render equipment slots
+    const slotLabels = {
+        arme: 'Arme', botte: 'Botte', ceinture: 'Ceinture', amulette: 'Amulette', anneau: 'Anneau', plastron: 'Plastron', chapeau: 'Chapeau', artefact: 'Artefact'
+    };
+    equipEl.innerHTML = Object.keys(player.equipment).map(slot => {
+        const id = player.equipment[slot];
+        if (!id) return `<div class="equip-slot"><div class="slot-name">${slotLabels[slot]}</div><div class="slot-item muted">vide</div></div>`;
+        const def = ITEMS[id] || { name: id, rarity: 'common' };
+        const r = RARITIES[def.rarity] || { color: 'white' };
+        const glow = r.glow ? 'text-shadow:0 0 6px rgba(255,215,0,0.8);' : '';
+        const style = `color:${r.color};${glow}`;
+        return `<div class="equip-slot"><div class="slot-name">${slotLabels[slot]}</div><div class="slot-item" style="${style}">${def.name}</div><button onclick="unequipSlot('${slot}')">Déséquiper</button></div>`;
+    }).join('');
+
+    // render inventory items
+    if (!player.inventory || player.inventory.length === 0) {
+        invEl.innerHTML = '<div class="inv-item muted">Inventaire vide</div>';
+        return;
+    }
+    invEl.innerHTML = player.inventory.map((it, i) => {
+        const id = typeof it === 'string' ? it : it.id;
+        const def = ITEMS[id] || (typeof it === 'object' ? it : { name: id, rarity: 'common' });
+        const r = RARITIES[def.rarity] || { color: 'white' };
+        const glow = r.glow ? 'text-shadow:0 0 6px rgba(255,215,0,0.8);' : '';
+        const style = `color:${r.color};${glow}`;
+        const simpleType = getSimpleType(def);
+        const equipBtn = `<button onclick="equipItem(${i})">Équiper (${simpleType})</button>`;
         const useBtn = def.heal ? ` <button onclick="useItem(${i})">Utiliser</button>` : '';
-        return `<span style="${style}">${def.name}</span>${useBtn}`;
-    }).join(', ');
+        const sellBtn = `<button onclick="sellItem(${i})">Vendre (${getSellPrice(id)}g)</button>`;
+        return `<div class="inv-item" style="${style}"><div>${def.name}</div><div>${equipBtn}${useBtn}${sellBtn}</div></div>`;
+    }).join('');
 }
 
 // Render the droppable items catalog into the #catalog panel
@@ -453,8 +730,8 @@ function endCombatCleanup(reason) {
         catalogEl.setAttribute('aria-hidden', 'true');
     }
 
-    // clear enemy and enemy display
-    currentEnemy = null;
+    // clear enemies and enemy display
+    currentEnemies = [];
     renderEnemyInfo();
 
     // After a short delay, clear the log to keep the UI clean and show a ready message
