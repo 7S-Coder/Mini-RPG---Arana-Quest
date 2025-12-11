@@ -200,6 +200,11 @@ function updateInventory() {
     el.textContent = 'Inventaire : ' + (player.inventory.length ? player.inventory.join(', ') : 'vide');
 }
 
+// load saved player if present (before first save in updateStats)
+let _hadSaved = false;
+try { _hadSaved = !!localStorage.getItem(STORAGE_KEY); } catch(e) { _hadSaved = false; }
+loadPlayer();
+if (_hadSaved) 
 updateStats();
 
 // Cleanup UI at the end of a combat (victory or successful flee)
