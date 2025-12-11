@@ -1,9 +1,9 @@
 todolist pour l'app, features a ajouté 
 <!-- [ ] - Ajouter une authentification -->
 [X] - Parser la progression dans le localStorage
-[ ] - Ajouter des monstres
-[ ] - Possibilité de combat avec plusieurs monstres
-[ ] - Ajout d'item commune (blanc), rare (bleu), epic (rose), legendaire (jaune), mythic (dorée avec effet)
+[X] - Ajouter des monstres
+[X] - Possibilité de combat avec plusieurs monstres
+[X] - Ajout d'item commune (blanc), rare (bleu), epic (rose), legendaire (jaune), mythic (dorée avec effet)
     [X] - Plastron
     [X] - Botte
     [X] - Ceinture

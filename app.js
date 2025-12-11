@@ -286,9 +286,9 @@ window.unequipSlot = unequipSlot;
 
 // Recalculate player.damage and defense from base + equipment (naive additive)
 function recalcStatsFromEquipment() {
-    // start from base defaults (could store base values elsewhere)
-    player.damage = 10; // base
-    player.defense = 5; // base
+    // start from player's base values
+    player.damage = typeof player.baseDamage === 'number' ? player.baseDamage : 10;
+    player.defense = typeof player.baseDefense === 'number' ? player.baseDefense : 5;
     Object.values(player.equipment).forEach(eid => {
         if (!eid) return;
         const def = ITEMS[eid];
@@ -296,6 +296,35 @@ function recalcStatsFromEquipment() {
         if (def.dmg) player.damage += def.dmg;
         if (def.def) player.defense += def.def;
     });
+}
+
+// Check and apply level ups if player has enough XP. Multiple levels possible.
+function checkLevelUp() {
+    let leveled = false;
+    // while enough XP for next level
+    while (player.xp >= xpToNextLevel(player.lvl)) {
+        const needed = xpToNextLevel(player.lvl);
+        // consume XP for this level
+        player.xp -= needed;
+        player.lvl += 1;
+        // stat gains (simple scaling): HP grows with level, damage and defense small increments
+        const hpGain = 10 + Math.floor(player.lvl * 1.5);
+        const dmgGain = 2 + Math.floor(player.lvl / 10);
+        const defGain = 1 + Math.floor(player.lvl / 15);
+        player.maxHp = (typeof player.maxHp === 'number' ? player.maxHp : 100) + hpGain;
+        // heal the player by the gained HP so they feel rewarded
+        player.hp = Math.min(player.maxHp, (typeof player.hp === 'number' ? player.hp : player.maxHp) + hpGain);
+        player.baseDamage = (typeof player.baseDamage === 'number' ? player.baseDamage : 10) + dmgGain;
+        player.baseDefense = (typeof player.baseDefense === 'number' ? player.baseDefense : 5) + defGain;
+        leveled = true;
+        logHTML(`🎉 Niveau supérieur ! Vous êtes maintenant niveau <strong>${player.lvl}</strong> — +${hpGain} PV, +${dmgGain} DMG, +${defGain} DEF.`);
+    }
+    if (leveled) {
+        // reapply equipment modifiers on top of new base stats
+        recalcStatsFromEquipment();
+        // persist and refresh UI (but avoid infinite recursion: updateStats will still render)
+        savePlayer();
+    }
 }
 
 const player = new Player();
@@ -383,6 +412,8 @@ function renderXPBar() {
 }
 
 function updateStats() {
+    // apply any pending level ups first
+    checkLevelUp();
     const neededXP = xpToNextLevel(player.lvl);
     const s = `HP: ${player.hp}/${player.maxHp}\nNiveau: ${player.lvl}  XP: ${player.xp}/${neededXP}xp\nDégâts: ${player.damage}  Défense: ${player.defense}\nOr: ${player.gold}`;
     const statsEl = document.getElementById('playerStats');
@@ -467,9 +498,15 @@ document.getElementById('attackBtn').addEventListener('click', () => {
     log(`⚔️ Vous infligez ${actualDamage} dégâts à ${target.name} (def ${target.defense || 0})`);
     if (target.hp <= 0) {
         // reward for this kill
-        const xpGain = randInt(6, 16);
+        // XP: base roll scaled by enemy level and rarity multiplier
+        const baseXp = randInt(6, 16);
+        const levelFactor = 1 + (target.level || 1) / 10; // multiplicative factor from enemy level
+        const RARITY_XP_MULT = { common: 1, rare: 1.5, epic: 2, legendary: 3, mythic: 6 };
+        const tier = target.tier || 'common';
+        const rarityMult = RARITY_XP_MULT[tier] || 1;
+        const xpGain = Math.max(1, Math.floor(baseXp * levelFactor * rarityMult));
         const goldGain = randInt(4, 14);
-        log(`💀 ${target.name} vaincu ! Vous gagnez ${xpGain} XP et ${goldGain} or.`);
+        log(`💀 ${target.name} vaincu ! Vous gagnez ${xpGain} XP et ${goldGain} or. (${tier} ×${rarityMult}, lvl ${target.level})`);
         player.xp += xpGain; player.gold += goldGain;
         // decide drop by rarity probabilities
         const totalDrop = sumObjectValues(RARITY_DROP_RATES);
