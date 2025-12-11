@@ -133,6 +133,17 @@ body{
 .btn.danger{background:linear-gradient(180deg,#7a2216,#b23b2b);color:#fff}
 .btn:active{transform:translateY(1px)}
 
+/* Mobile fixed controls (bottom) */
+.mobile-controls{position:fixed;left:0;right:0;bottom:0;display:flex;gap:12px;justify-content:space-around;align-items:center;padding:12px;background:linear-gradient(180deg,rgba(11,11,11,0.9),rgba(6,6,6,0.85));box-shadow:0 -8px 30px rgba(0,0,0,0.6);z-index:1200;padding-bottom:calc(12px + env(safe-area-inset-bottom, 0px));}
+.mobile-controls .btn{padding:14px 18px;font-size:1rem;min-width:88px;border-radius:14px}
+.mobile-controls .btn:active{transform:translateY(1px) scale(0.995)}
+.mobile-controls .btn:focus{outline:2px solid rgba(255,255,255,0.08);outline-offset:2px}
+.mobile-controls .btn{ -webkit-tap-highlight-color: transparent; touch-action: manipulation }
+
+@media(min-width:900px){
+  .mobile-controls{display:none}
+}
+
 .shop{display:none}
 .shopItem,.shop-item{padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);color:var(--muted);border:1px solid rgba(255,255,255,0.02)}
 
@@ -177,6 +188,45 @@ body{
 /* On larger screens keep modals a bit narrower */
 @media(min-width:900px){
   .shop, #catalog{width:min(720px,88vw)}
+}
+
+/* Mobile / small-screen adjustments for Inventory modal */
+@media(max-width:899px){
+  /* Make modal act like a full-screen sheet for easier touch interaction */
+  .modal{
+    position:fixed;
+    left:0; top:0; right:0; bottom:0;
+    width:100vw; height:100vh;
+    transform:none; border-radius:0;
+    margin:0; overflow:auto; z-index:1201; max-height:none;
+  }
+  .modal .modal-content{padding:18px}
+  .modal-columns{flex-direction:column;gap:12px}
+  .modal-column{width:100%}
+
+  /* Hide the decorative humanoid figure to reduce clutter */
+  .equipment-figure{display:none}
+  .equipment{min-height:auto;display:block}
+
+  /* Render equip slots as a responsive grid / list instead of absolute positioning */
+  .equipment-slots{position:static;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:8px;padding:4px}
+  .equipment .equip-slot{position:relative;min-width:0;min-height:72px;padding:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:12px;background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.00));border:1px solid rgba(255,255,255,0.03);box-shadow:none}
+  .equipment .slot-name{font-size:0.78rem;color:#d6cfc1;margin-bottom:6px}
+  .equipment .slot-item{font-size:0.95rem;color:#fff}
+  .equipment .equip-slot button{margin-top:8px;padding:8px 10px;border-radius:8px;font-size:0.9rem}
+
+  /* Make inventory items stack nicely and enlarge tap targets */
+  .inv-item, .shop-item, .catalog-item{padding:10px;border-radius:10px;width:100%}
+  .inv-item .item-actions button, .shop-item .item-actions button, .catalog-item .item-actions button{padding:8px 10px}
+
+  /* Disable hover tooltips on touch devices to avoid overlapping UI — show no tooltips by default */
+  .item-tooltip{display:none !important}
+
+  /* Hide explicit "Déséquiper" buttons on mobile — tap the slot to unequip */
+  .equipment .equip-slot button{display:none}
+
+  /* Ensure modal close is reachable and larger */
+  .modal-close{right:14px;top:12px;font-size:1.3rem}
 }
 
 /* Tier legend */

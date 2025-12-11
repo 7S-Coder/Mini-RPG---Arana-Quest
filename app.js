@@ -781,13 +781,13 @@ function updateInventory() {
     equipSlotsEl.innerHTML = Object.keys(player.equipment).map(slot => {
         const cls = `equip-slot slot-${slot}`;
         const id = player.equipment[slot];
-        if (!id) return `<div class="${cls}"><div class="slot-name">${slotLabels[slot]}</div><div class="slot-item muted">vide</div></div>`;
+        if (!id) return `<div class="${cls}" data-slot="${slot}" role="button" tabindex="0"><div class="slot-name">${slotLabels[slot]}</div><div class="slot-item muted">vide</div></div>`;
         const def = ITEMS[id] || { name: id, rarity: 'common' };
         const r = RARITIES[def.rarity] || { color: 'white' };
         const glow = getGlowStyle(r);
         const style = `color:${r.color};${glow}`;
         const tooltip = getItemTooltipHTML(id);
-        return `<div class="${cls}"><div class="slot-name">${slotLabels[slot]}</div><div class="slot-item" style="${style}">${def.name}${tooltip}</div><button onclick="unequipSlot('${slot}')">Déséquiper</button></div>`;
+        return `<div class="${cls}" data-slot="${slot}" role="button" tabindex="0"><div class="slot-name">${slotLabels[slot]}</div><div class="slot-item" style="${style}">${def.name}${tooltip}</div><button onclick="unequipSlot('${slot}')">Déséquiper</button></div>`;
     }).join('');
 
     // render inventory items
@@ -808,6 +808,33 @@ function updateInventory() {
         const tooltip = getItemTooltipHTML(id);
         return `<div class="inv-item" style="${style}"><div>${def.name}${tooltip}</div><div>${equipBtn}${useBtn}${sellBtn}</div></div>`;
     }).join('');
+
+    // Attach mobile-friendly handlers: single tap on equip slot unequips (only for touch/mobile sizes)
+    (function attachMobileEquipHandlers() {
+        try {
+            if (!equipSlotsEl) return;
+            const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+            const isMobileSize = window.matchMedia && window.matchMedia('(max-width:899px)').matches;
+            if (!isTouch || !isMobileSize) return;
+            const slots = equipSlotsEl.querySelectorAll('.equip-slot');
+            slots.forEach(el => {
+                const slotName = el.dataset.slot;
+                if (!slotName) return;
+                if (el.dataset.mobileHandled) return; // avoid duplicate handlers
+                el.dataset.mobileHandled = '1';
+                // ignore taps on inner buttons (keep explicit Déséquiper button as fallback)
+                el.addEventListener('click', (ev) => {
+                    if (ev.target.closest('button')) return;
+                    // direct unequip on tap
+                    try { unequipSlot(slotName); } catch (e) { console.warn(e); }
+                });
+                // keyboard accessibility: Enter/Space also unequip
+                el.addEventListener('keydown', (ev) => {
+                    if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); try { unequipSlot(slotName); } catch (e) {} }
+                });
+            });
+        } catch (e) { console.warn('attachMobileEquipHandlers error', e); }
+    })();
 }
 
 // Render the droppable items catalog into the #catalog panel
@@ -964,4 +991,18 @@ function endCombatCleanup(reason) {
     // refresh stats UI
     updateStats();
 }
+
+// --- Mobile touch helpers: map big bottom buttons to existing actions ---
+function addTouchClick(el, handler) {
+    if (!el) return;
+    let active = false;
+    el.addEventListener('touchstart', (e) => { try{ e.preventDefault(); } catch(e){} active = true; el.classList.add('active'); }, { passive: false });
+    el.addEventListener('touchend', (e) => { if (active) { try{ e.preventDefault(); } catch(e){} handler(); } active = false; el.classList.remove('active'); }, { passive: false });
+    // fallback/click for desktop and accessibility
+    el.addEventListener('click', (e) => { handler(); });
+}
+
+addTouchClick(document.getElementById('mobileAttack'), () => { const b = document.getElementById('attackBtn'); if (b) b.click(); });
+addTouchClick(document.getElementById('mobileRun'), () => { const b = document.getElementById('runBtn'); if (b) b.click(); });
+addTouchClick(document.getElementById('mobileArena'), () => { const b = document.getElementById('goToArena'); if (b) b.click(); });
 

@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Arena Quest — Mini MMORPG</title>
     <meta name="theme-color" content="#1b1b1b">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -106,6 +106,13 @@
             </div>
         </div>
     </div>
+
+    <!-- Mobile bottom controls (visible on small screens) -->
+    <nav id="mobileControls" class="mobile-controls" aria-hidden="false">
+        <button id="mobileAttack" class="btn danger" aria-label="Attaquer">Attaquer</button>
+        <button id="mobileArena" class="btn primary" aria-label="Aller à l'arène">Arène</button>
+        <button id="mobileRun" class="btn" aria-label="Fuir">Fuir</button>
+    </nav>
 
     <script type="module" src="app.js"></script>
 </body>
