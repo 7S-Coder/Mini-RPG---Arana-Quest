@@ -11,6 +11,8 @@
 
 *{box-sizing:border-box}
 html,body{height:100%}
+/* prevent horizontal overflow on small screens */
+body{overflow-x:hidden}
 body{
   margin:0;
   font-family: 'Roboto Mono', monospace;
@@ -35,6 +37,10 @@ body{
 .hp-bar{height:12px;background:rgba(255,255,255,0.04);border-radius:10px;overflow:hidden}
 .hp-fill{height:100%;background:linear-gradient(90deg,var(--accent-2),#ffd36b);width:100%}
 
+/* XP bar (under HP) */
+.xp-bar{height:8px;background:rgba(255,255,255,0.03);border-radius:8px;overflow:hidden;margin-top:6px}
+.xp-bar .hp-fill{height:100%;width:0%;transition:width 300ms ease}
+
 .stats{white-space:pre-line;font-size:0.85rem;color:#e6e1d9}
 .inventory{font-size:0.85rem;color:#cfc6b7;margin-top:8px}
 
@@ -42,13 +48,44 @@ body{
 .equipment-panel{margin-top:10px}
 .equipment{display:flex;flex-wrap:wrap;gap:8px}
 .equip-slot{min-width:64px;min-height:64px;border-radius:8px;background:rgba(255,255,255,0.02);display:flex;align-items:center;justify-content:center;flex-direction:column;padding:6px;border:1px solid rgba(255,255,255,0.03)}
+.equip-slot{position:relative}
 .equip-slot .slot-name{font-size:0.7rem;color:#bfb8a9}
 .equip-slot .slot-item{font-size:0.8rem;color:#fff;margin-top:4px}
 .inventory-panel{margin-top:10px}
 .inventory-list{display:flex;flex-wrap:wrap;gap:8px}
-.inv-item{padding:6px 8px;border-radius:8px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.02);display:flex;align-items:center;gap:8px}
-.inv-item button{padding:4px 6px;border-radius:6px;font-size:0.75rem}
-.catalog-item{padding:8px;border-radius:8px;margin-bottom:6px;background:rgba(255,255,255,0.01);border:1px solid rgba(255,255,255,0.02)}
+.inv-item, .shop-item, .catalog-item{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  padding:12px;
+  border-radius:12px;
+  background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  border:1px solid rgba(255,255,255,0.03);
+  box-shadow: 0 6px 14px rgba(0,0,0,0.55);
+  width:100%;
+  box-sizing:border-box;
+  transition:transform 120ms ease, box-shadow 120ms ease;
+}
+.catalog-item:hover{ transform:translateY(-3px); box-shadow:0 12px 30px rgba(0,0,0,0.65) }
+.inv-item .item-actions, .shop-item .item-actions, .catalog-item .item-actions{display:flex;gap:8px;flex-wrap:wrap}
+.inv-item .item-main, .shop-item .item-main, .catalog-item .item-main{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.inv-item button, .shop-item button{padding:6px 8px;border-radius:8px;font-size:0.85rem}
+.inv-item{position:relative}
+.shop-item{position:relative}
+
+/* Item tooltip shown on hover */
+.item-tooltip{display:none;position:absolute;left:110%;top:0;min-width:200px;max-width:320px;background:linear-gradient(180deg,rgba(20,20,20,0.98),rgba(10,10,10,0.95));padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);box-shadow:0 8px 24px rgba(0,0,0,0.6);z-index:60;color:var(--muted);font-size:0.85rem}
+.inv-item:hover .item-tooltip, .shop-item:hover .item-tooltip, .catalog-item:hover .item-tooltip, .equip-slot:hover .item-tooltip{display:block}
+
+/* For catalog entries show tooltip to the left to avoid going off-screen */
+.catalog-item .item-tooltip{left:auto;right:110%}
+/* For shop (right column) show tooltip to the left inside the window */
+.shop .shop-item .item-tooltip{left:auto;right:110%}
+.item-tooltip .tt-name{font-weight:700;margin-bottom:6px;color:#fff}
+.item-tooltip .tt-row{display:flex;justify-content:space-between;padding:2px 0}
+.item-tooltip .tt-row .label{color:#bfb8a9}
+.item-tooltip .tt-row .value{color:#e6e1d9}
+.catalog-item{margin-bottom:8px}
 .drop-rate{font-size:0.8rem;color:#c9d6c3;margin-left:8px}
 
 .arena .arena-top{display:flex;gap:8px;align-items:center;justify-content:space-between}
@@ -84,8 +121,17 @@ body{
 .btn.danger{background:linear-gradient(180deg,#7a2216,#b23b2b);color:#fff}
 .btn:active{transform:translateY(1px)}
 
-.shop{display:none;margin-top:10px;display:flex;flex-direction:column;gap:8px}
+.shop{display:none}
 .shopItem,.shop-item{padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);color:var(--muted);border:1px solid rgba(255,255,255,0.02)}
+
+/* Modal/backdrop styles for shop and catalog */
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:900;display:none}
+.shop, #catalog{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:linear-gradient(180deg,var(--panel),#0b0b0b);padding:12px;border-radius:12px;box-shadow:0 12px 36px rgba(0,0,0,0.7);z-index:1000;max-width:95vw;width:92vw;max-height:90vh;overflow:auto;border:1px solid rgba(255,255,255,0.03)}
+
+/* On larger screens keep modals a bit narrower */
+@media(min-width:900px){
+  .shop, #catalog{width:min(720px,88vw)}
+}
 
 /* Tier legend */
 .tier-legend{margin-top:12px;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.02)}
@@ -112,6 +158,9 @@ body{
 @media(min-width:900px){
   .container{grid-template-columns:260px 1fr 220px}
   .log{height:260px}
+  /* on wide screens show items as rows */
+  .inv-item, .shop-item, .catalog-item{flex-direction:row;align-items:center}
+  .inv-item .item-main, .shop-item .item-main, .catalog-item .item-main{flex:1}
 }
 
 /* Accessibility and small touches */

@@ -25,6 +25,9 @@
                 <div class="hp-bar" aria-hidden="false">
                     <div id="hpFill" class="hp-fill"></div>
                 </div>
+                <div class="xp-bar" aria-hidden="false" title="Progression vers le niveau suivant">
+                    <div id="xpFill" class="hp-fill" style="background:linear-gradient(90deg,#6fb3ff,#8ae6ff)"></div>
+                </div>
             </div>
             <p id="playerStats" class="stats"></p>
             <div id="equipmentPanel" class="equipment-panel">
@@ -65,6 +68,9 @@
     </main>
 
     <footer class="site-footer">Version alpha — Améliore l'interface pour mobile</footer>
+
+    <!-- Backdrop for modals (shop / catalog) -->
+    <div id="modalBackdrop" class="modal-backdrop" style="display:none;"></div>
 
     <script type="module" src="app.js"></script>
 </body>

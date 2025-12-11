@@ -63,8 +63,18 @@ const RARITIES = {
   rare:      { color: "blue", weight: 18 },
   epic:      { color: "pink", weight: 8 },
   legendary: { color: "yellow", weight: 3 },
-  mythic:    { color: "gold", glow: true, weight: 1 }
+    mythic:    { color: "#ff4d4d", glow: true, glowColor: 'rgba(255,80,80,0.95)', weight: 1 }
 };
+
+// Helper to produce glow style string for a rarity or tier config
+function getGlowStyle(cfg, opts = {}) {
+        if (!cfg || !cfg.glow) return '';
+        const type = opts.type || 'text';
+        const size = typeof opts.size === 'number' ? opts.size : (type === 'box' ? 8 : 6);
+        const color = cfg.glowColor || 'rgba(255,215,0,0.9)';
+        if (type === 'box') return `box-shadow:0 0 ${size}px ${color};`;
+        return `text-shadow:0 0 ${size}px ${color};`;
+}
 
 const ITEMS = {
     potion:       { id: 'potion', name: 'Potion de soin', rarity: 'common', type: 'artefact', heal: 30, cost: 10 },
@@ -113,7 +123,7 @@ const ENEMY_TIERS = {
     rare:      { weight: 25, levelMin: 6,  levelMax: 15,  color: '#55aaff' },
     epic:      { weight: 9,  levelMin: 16, levelMax: 30,  color: '#d46cff' },
     legendary: { weight: 4,  levelMin: 31, levelMax: 59,  color: '#ffcc33' },
-    mythic:    { weight: 2,  levelMin: 60, levelMax: 100, color: '#ffd700', glow: true }
+    mythic:    { weight: 2,  levelMin: 60, levelMax: 100, color: '#ff4d4d', glow: true, glowColor: 'rgba(255,80,80,0.95)' }
 };
 
 function sumWeights(obj) {
@@ -358,11 +368,27 @@ function renderHPBar() {
     el.style.width = pct + '%';
 }
 
+// XP progression: simple formula for XP required to next level
+function xpToNextLevel(lvl) {
+    // linear growth: 100 * level (level 1 -> 100 XP to next)
+    return Math.max(20, 100 * (lvl || 1));
+}
+
+function renderXPBar() {
+    const el = document.getElementById('xpFill');
+    if (!el) return;
+    const needed = xpToNextLevel(player.lvl);
+    const pct = Math.max(0, Math.min(100, (player.xp / needed) * 100));
+    el.style.width = pct + '%';
+}
+
 function updateStats() {
-    const s = `HP: ${player.hp}/${player.maxHp}\nNiveau: ${player.lvl}  XP: ${player.xp}\nDégâts: ${player.damage}  Défense: ${player.defense}\nOr: ${player.gold}`;
+    const neededXP = xpToNextLevel(player.lvl);
+    const s = `HP: ${player.hp}/${player.maxHp}\nNiveau: ${player.lvl}  XP: ${player.xp}/${neededXP}xp\nDégâts: ${player.damage}  Défense: ${player.defense}\nOr: ${player.gold}`;
     const statsEl = document.getElementById('playerStats');
     if (statsEl) statsEl.textContent = s;
     renderHPBar();
+    renderXPBar();
     updateInventory();
     renderEnemyInfo();
     // persist progress automatically whenever stats update
@@ -380,7 +406,7 @@ function renderEnemyInfo() {
         const html = currentEnemies.map((e, i) => {
             const cfg = ENEMY_TIERS[e.tier] || {};
             const color = cfg.color || '#fff';
-            const glow = cfg.glow ? 'text-shadow:0 0 8px rgba(255,215,0,0.9);' : '';
+            const glow = getGlowStyle(cfg, { type: 'text', size: 8 });
             const dead = e.hp <= 0;
             const name = `<span class="ec-name" style="color:${color};${glow}">${e.name}</span>`;
             const meta = `<span class="ec-meta">${e.tier} — lvl ${e.level}</span>`;
@@ -396,7 +422,7 @@ function renderTierLegend() {
     if (!el) return;
     const items = Object.entries(ENEMY_TIERS).map(([k, v]) => {
         const color = v.color || '#fff';
-        const glow = v.glow ? 'box-shadow:0 0 8px rgba(255,215,0,0.8);' : '';
+        const glow = getGlowStyle(v, { type: 'box', size: 8 });
         const range = v.levelMin && v.levelMax ? `lvl ${v.levelMin}-${v.levelMax}` : '';
         return `<div class="tier-item"><span class="swatch" style="background:${color};${glow}"></span><span class="tier-name">${k}</span><span class="tier-range">${range}</span></div>`;
     }).join('');
@@ -520,9 +546,17 @@ document.getElementById('openShop').addEventListener('click', () => {
     if (!shopEl) return;
     // render/shop refresh when opening
     renderShop();
-    const shown = shopEl.style.display === 'flex';
-    shopEl.style.display = shown ? 'none' : 'flex';
-    shopEl.setAttribute('aria-hidden', shown ? 'true' : 'false');
+    const backdrop = document.getElementById('modalBackdrop');
+    const shown = shopEl.style.display && shopEl.style.display !== 'none';
+    if (shown) {
+        shopEl.style.display = 'none';
+        if (backdrop) backdrop.style.display = 'none';
+        shopEl.setAttribute('aria-hidden', 'true');
+    } else {
+        shopEl.style.display = 'block';
+        if (backdrop) backdrop.style.display = 'block';
+        shopEl.setAttribute('aria-hidden', 'false');
+    }
 });
 
 // Rotating expensive equipment pool (ids from ITEMS)
@@ -566,9 +600,10 @@ function renderShop() {
     if (!shopEl) return;
     // potion buy at fixed price 20g
     const pR = RARITIES['common'] || { color: '#fff' };
-    const pGlow = pR.glow ? 'text-shadow:0 0 6px rgba(255,215,0,0.8);' : '';
+    const pGlow = getGlowStyle(pR);
     const pStyle = `color:${pR.color};${pGlow}`;
-    let html = `<div class="shop-item"><span style="${pStyle}">Potion de soin</span> — 20g <button data-action="buy" data-id="potion">Acheter</button></div>`;
+    const potionTooltip = getItemTooltipHTML('potion');
+    let html = `<div class="shop-item"><span style="${pStyle}">Potion de soin</span> ${potionTooltip} — 20g <button data-action="buy" data-id="potion">Acheter</button></div>`;
     // rotating equipments
     const rot = getRotatingShopItems();
     html += `<div style="margin-top:8px;font-weight:700">Équipements en boutique (rotation horaire)</div>`;
@@ -576,11 +611,21 @@ function renderShop() {
         const def = ITEMS[id];
         if (!def) return;
         const r = RARITIES[def.rarity] || { color: '#fff' };
-        const glow = r.glow ? 'text-shadow:0 0 6px rgba(255,215,0,0.8);' : '';
+        const glow = getGlowStyle(r);
         const style = `color:${r.color};${glow}`;
-        html += `<div class="shop-item"><span style="${style}">${def.name}</span> — ${def.rarity} — ${def.cost || 'N/A'}g <button data-action="buy" data-id="${id}">Acheter</button></div>`;
+        const tooltip = getItemTooltipHTML(id);
+        html += `<div class="shop-item"><span style="${style}">${def.name}</span> ${tooltip} — ${def.rarity} — ${def.cost || 'N/A'}g <button data-action="buy" data-id="${id}">Acheter</button></div>`;
     });
-    shopEl.innerHTML = html;
+    // include a close control for modal behavior
+    shopEl.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><strong>Magasin</strong><button id="closeShop" class="btn">Fermer</button></div>${html}`;
+    // wire close button
+    const close = document.getElementById('closeShop');
+    const backdrop = document.getElementById('modalBackdrop');
+    if (close) close.addEventListener('click', () => {
+        shopEl.style.display = 'none';
+        if (backdrop) backdrop.style.display = 'none';
+        shopEl.setAttribute('aria-hidden', 'true');
+    });
 }
 
 // delegation for buy buttons
@@ -625,9 +670,10 @@ function updateInventory() {
         if (!id) return `<div class="equip-slot"><div class="slot-name">${slotLabels[slot]}</div><div class="slot-item muted">vide</div></div>`;
         const def = ITEMS[id] || { name: id, rarity: 'common' };
         const r = RARITIES[def.rarity] || { color: 'white' };
-        const glow = r.glow ? 'text-shadow:0 0 6px rgba(255,215,0,0.8);' : '';
+        const glow = getGlowStyle(r);
         const style = `color:${r.color};${glow}`;
-        return `<div class="equip-slot"><div class="slot-name">${slotLabels[slot]}</div><div class="slot-item" style="${style}">${def.name}</div><button onclick="unequipSlot('${slot}')">Déséquiper</button></div>`;
+        const tooltip = getItemTooltipHTML(id);
+        return `<div class="equip-slot"><div class="slot-name">${slotLabels[slot]}</div><div class="slot-item" style="${style}">${def.name}${tooltip}</div><button onclick="unequipSlot('${slot}')">Déséquiper</button></div>`;
     }).join('');
 
     // render inventory items
@@ -645,7 +691,8 @@ function updateInventory() {
         const equipBtn = `<button onclick="equipItem(${i})">Équiper (${simpleType})</button>`;
         const useBtn = def.heal ? ` <button onclick="useItem(${i})">Utiliser</button>` : '';
         const sellBtn = `<button onclick="sellItem(${i})">Vendre (${getSellPrice(id)}g)</button>`;
-        return `<div class="inv-item" style="${style}"><div>${def.name}</div><div>${equipBtn}${useBtn}${sellBtn}</div></div>`;
+        const tooltip = getItemTooltipHTML(id);
+        return `<div class="inv-item" style="${style}"><div>${def.name}${tooltip}</div><div>${equipBtn}${useBtn}${sellBtn}</div></div>`;
     }).join('');
 }
 
@@ -658,7 +705,7 @@ function renderDroppableCatalog() {
         const it = ITEMS[key];
         if (!it) return '';
         const r = RARITIES[it.rarity] || { color: 'white' };
-        const glow = r.glow ? 'text-shadow:0 0 6px rgba(255,215,0,0.8);' : '';
+        const glow = getGlowStyle(r);
         const style = `color:${r.color};${glow}`;
         const simpleType = getSimpleType(it);
         const typeLabel = simpleType ? ` <span class="item-type">(${simpleType})</span>` : '';
@@ -666,7 +713,8 @@ function renderDroppableCatalog() {
         const rate = getItemDropRate(key);
         const pct = (rate * 100).toFixed(3).replace(/\.000$/, '');
         const rateLabel = ` <span class="drop-rate">Taux de drop: ${pct}%</span>`;
-        return `<div class="catalog-item"><strong style="${style}">${it.name}</strong> ${typeLabel} — <em>${it.rarity}</em> ${extra}${rateLabel}</div>`;
+        const tooltip = getItemTooltipHTML(key);
+        return `<div class="catalog-item"><strong style="${style}">${it.name}</strong> ${typeLabel} — <em>${it.rarity}</em> ${extra}${rateLabel}${tooltip}</div>`;
     }).join('');
     el.innerHTML = `<div class="catalog-head"><h3>Catalogue des drops</h3><button id="closeCatalog" class="btn">Fermer</button></div>${html}`;
     // wire close button
@@ -678,8 +726,10 @@ function toggleCatalog(show) {
     const el = document.getElementById('catalog');
     const btn = document.getElementById('openCatalogBtn');
     if (!el || !btn) return;
+    const backdrop = document.getElementById('modalBackdrop');
     const willShow = typeof show === 'boolean' ? show : (el.style.display === 'none');
-    el.style.display = willShow ? 'flex' : 'none';
+    el.style.display = willShow ? 'block' : 'none';
+    if (backdrop) backdrop.style.display = willShow ? 'block' : 'none';
     el.setAttribute('aria-hidden', willShow ? 'false' : 'true');
     // reflect state on button (optional)
     btn.classList.toggle('active', willShow);
@@ -689,6 +739,18 @@ function toggleCatalog(show) {
 // hook catalog open button
 const catalogBtn = document.getElementById('openCatalogBtn');
 if (catalogBtn) catalogBtn.addEventListener('click', () => toggleCatalog());
+
+// clicking backdrop closes any open modal
+const modalBackdropEl = document.getElementById('modalBackdrop');
+if (modalBackdropEl) {
+    modalBackdropEl.addEventListener('click', () => {
+        const shop = document.getElementById('shop');
+        const catalog = document.getElementById('catalog');
+        if (shop) { shop.style.display = 'none'; shop.setAttribute('aria-hidden', 'true'); }
+        if (catalog) { catalog.style.display = 'none'; catalog.setAttribute('aria-hidden', 'true'); }
+        modalBackdropEl.style.display = 'none';
+    });
+}
 
 // Simplify types to the requested set: arme, botte, ceinture, amulette, anneau, plastron, chapeau, artefact
 function getSimpleType(def) {
@@ -704,6 +766,21 @@ function getSimpleType(def) {
     if (t.includes('head') || t.includes('hood') || t.includes('coiffe') || t.includes('crown')) return 'chapeau';
     // fallback: map consumables and others to 'artefact' to avoid showing irrelevant types
     return 'artefact';
+}
+
+// Returns tooltip HTML for an item key (used inside .inv-item, .shop-item, .catalog-item)
+function getItemTooltipHTML(key) {
+    const it = ITEMS[key] || {};
+    const parts = [];
+    if (it.name) parts.push(`<div class="tt-name">${it.name}</div>`);
+    if (it.heal) parts.push(`<div class="tt-row"><div class="label">Soigne</div><div class="value">+${it.heal} HP</div></div>`);
+    if (it.dmg) parts.push(`<div class="tt-row"><div class="label">DMG</div><div class="value">${it.dmg}</div></div>`);
+    if (it.def) parts.push(`<div class="tt-row"><div class="label">DEF</div><div class="value">${it.def}</div></div>`);
+    if (it.cost) parts.push(`<div class="tt-row"><div class="label">Prix</div><div class="value">${it.cost} g</div></div>`);
+    if (it.rarity) parts.push(`<div class="tt-row"><div class="label">Rareté</div><div class="value">${it.rarity}</div></div>`);
+    if (it.desc) parts.push(`<div class="tt-row"><div class="label">Info</div><div class="value">${it.desc}</div></div>`);
+    if (parts.length === 0) return '';
+    return `<div class="item-tooltip">${parts.join('')}</div>`;
 }
 
 // load saved player if present (before first save in updateStats)
