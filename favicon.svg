@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <style type="text/css">
+      /* Avoid @import here — many browsers block external fonts for favicons. */
+      .q { font-family: Cinzel, serif; font-weight:700; font-size:160px; }
+    </style>
+  </defs>
+  <rect width="100%" height="100%" rx="36" ry="36" fill="#0f1113"/>
+  <text x="50%" y="54%" text-anchor="middle" dominant-baseline="middle" class="q" fill="#b25a3a">Q</text>
+</svg>
