@@ -1152,7 +1152,9 @@ function renderShop() {
     const pGlow = getGlowStyle(pR);
     const pStyle = `color:${pR.color};${pGlow}`;
     const potionTooltip = getItemTooltipHTML('potion');
-    let html = `<div class="shop-item"><span style="${pStyle}">Potion de soin</span> ${potionTooltip} — 20g <button data-action="buy" data-id="potion">Acheter</button></div>`;
+    const potionSimpleType = getSimpleType(ITEMS['potion']);
+    const potionTypeLabel = potionSimpleType ? ` <span class="item-type">(${potionSimpleType})</span>` : '';
+    let html = `<div class="shop-item"><span style="${pStyle}">Potion de soin${potionTypeLabel}</span> ${potionTooltip} — 20g <button data-action="buy" data-id="potion">Acheter</button></div>`;
     // rotating equipments
     const rot = getRotatingShopItems();
     html += `<div style="margin-top:8px;font-weight:700">Équipements en boutique (rotation horaire)</div>`;
@@ -1164,7 +1166,9 @@ function renderShop() {
         const style = `color:${r.color};${glow}`;
         const tooltip = getItemTooltipHTML(id);
         const stats = getItemStatsSummary(def);
-        html += `<div class="shop-item"><span style="${style}">${def.name} ${stats}</span> ${tooltip} — ${def.rarity} — ${def.cost || 'N/A'}g <button data-action="buy" data-id="${id}">Acheter</button></div>`;
+        const simpleType = getSimpleType(def);
+        const typeLabel = simpleType ? ` <span class="item-type">(${simpleType})</span>` : '';
+        html += `<div class="shop-item"><span style="${style}">${def.name}${typeLabel} ${stats}</span> ${tooltip} — ${def.rarity} — ${def.cost || 'N/A'}g <button data-action="buy" data-id="${id}">Acheter</button></div>`;
     });
     // include a close control for modal behavior
     shopEl.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><strong>Magasin</strong><button id="closeShop" class="btn">Fermer</button></div>${html}`;
