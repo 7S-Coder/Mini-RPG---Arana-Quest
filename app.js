@@ -190,6 +190,81 @@ function createMapEnemy(mapId, index) {
     } catch (e) { console.warn('createMapEnemy', e); return null; }
 }
 
+// --- Deterministic dungeon room generation ---
+// simple string hash to produce a 32-bit seed
+function hashStringToSeed(str) {
+    let h = 2166136261 >>> 0;
+    for (let i = 0; i < str.length; i++) {
+        h ^= str.charCodeAt(i);
+        h = Math.imul(h, 16777619) >>> 0;
+    }
+    return h >>> 0;
+}
+
+// Mulberry32 PRNG (seeded) returning function that yields [0,1)
+function mulberry32(seed) {
+    let t = seed >>> 0;
+    return function() {
+        t += 0x6D2B79F5;
+        let r = Math.imul(t ^ (t >>> 15), 1 | t);
+        r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+        return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+    };
+}
+
+function seededWeightedPick(obj, rand) {
+    const total = Object.values(obj).reduce((s, v) => s + (v.weight || 0), 0);
+    const r = rand() * total;
+    let acc = 0;
+    for (const [k, v] of Object.entries(obj)) {
+        acc += v.weight || 0;
+        if (r <= acc) return k;
+    }
+    return Object.keys(obj)[0];
+}
+
+function generateDungeonRooms(mapId, dungeonId) {
+    const mapCfg = MAPS[mapId] || null;
+    const dungeonCfg = mapCfg && Array.isArray(mapCfg.dungeons) ? mapCfg.dungeons.find(d => d.id === dungeonId) : null;
+    const roomsCount = (dungeonCfg && dungeonCfg.rooms) ? dungeonCfg.rooms : 3;
+    const seed = hashStringToSeed(`${mapId}|${dungeonId}`);
+    const rand = mulberry32(seed);
+    const rooms = [];
+    for (let r = 0; r < roomsCount; r++) {
+        const enemies = [];
+        // deterministic number of enemies: 1..3
+        const count = Math.floor(rand() * 3) + 1;
+        for (let i = 0; i < count; i++) {
+            // 60% pick unique map enemy if available
+            let tpl = null;
+            if (mapCfg && Array.isArray(mapCfg.uniqueEnemies) && mapCfg.uniqueEnemies.length > 0 && rand() < 0.6) {
+                const def = mapCfg.uniqueEnemies[Math.floor(rand() * mapCfg.uniqueEnemies.length)];
+                const name = `${def.name} #${r+1}-${i+1}`;
+                const hp = def.baseHp || Math.max(12, 18 + Math.floor(rand()*12));
+                const dmg = def.damage || Math.max(1, Math.floor(hp/8));
+                tpl = {
+                    name, maxHp: Math.floor(hp), hp: Math.floor(hp), damage: Math.floor(dmg), tier: def.tier || 'common', level: (ENEMY_TIERS[def.tier] && ENEMY_TIERS[def.tier].levelMin) ? Math.floor(rand() * (ENEMY_TIERS[def.tier].levelMax - ENEMY_TIERS[def.tier].levelMin + 1)) + ENEMY_TIERS[def.tier].levelMin : 1, defense: def.defense || def.def || 0, originMap: mapId
+                };
+            } else {
+                // pick a tier deterministically using seeded weights
+                const tier = seededWeightedPick(ENEMY_TIERS, rand);
+                const cfg = ENEMY_TIERS[tier] || ENEMY_TIERS.common;
+                const level = Math.floor(rand() * (cfg.levelMax - cfg.levelMin + 1)) + cfg.levelMin;
+                const names = GLOBAL_ENEMY_POOLS[tier] || GLOBAL_ENEMY_POOLS.common;
+                const baseName = names[Math.floor(rand() * names.length)];
+                const name = `${baseName} #${r+1}-${i+1}`;
+                const hp = Math.floor(20 + Math.pow(level, 1.35) * (6 + rand()*3));
+                const dmg = Math.max(1, Math.floor(level * (0.8 + rand() * 1.2)));
+                const def = Math.floor(level * (0.5 + rand() * 0.6));
+                tpl = { name, maxHp: hp, hp: hp, damage: dmg, tier, level, defense: def, originMap: mapId };
+            }
+            if (tpl) enemies.push(tpl);
+        }
+        rooms.push(enemies);
+    }
+    return rooms;
+}
+
 // convert hex color like '#aabbcc' to {r,g,b}
 function hexToRgb(hex) {
     if (!hex) return null;
@@ -625,40 +700,59 @@ function renderTierLegend() {
 renderTierLegend();
 
 function newEncounter() {
-    // spawn 1-3 enemies (map-aware)
-    const count = Math.floor(Math.random() * 3) + 1; // 1..3
+    // spawn enemies
     currentEnemies = [];
-    for (let i=0;i<count;i++) {
-        let e = null;
-        // if a map is selected, prefer its unique enemies sometimes
-        if (currentMap && MAPS[currentMap]) {
-            if (Math.random() < 0.6) {
-                e = createMapEnemy(currentMap, i);
+    // If we are in a dungeon and rooms were pre-generated, use the stored templates
+    if (currentDungeon && Array.isArray(currentDungeon.rooms)) {
+        const roomIndex = (typeof currentDungeon.room === 'number') ? currentDungeon.room : 0;
+        const templates = currentDungeon.rooms[roomIndex] || [];
+        templates.forEach((tpl, i) => {
+            const hp = tpl.maxHp || tpl.hp || 20;
+            const dmg = tpl.damage || 1;
+            const e = new Enemy(tpl.name || `Monstre ${i+1}`, Math.floor(hp), Math.floor(dmg));
+            e.maxHp = Math.floor(tpl.maxHp || tpl.hp || hp);
+            e.hp = Math.floor(tpl.hp || tpl.maxHp || e.maxHp);
+            e.level = tpl.level || 1;
+            e.tier = tpl.tier || 'common';
+            e.defense = tpl.defense || 0;
+            e.originMap = tpl.originMap || currentDungeon.mapId || currentMap;
+            currentEnemies.push(e);
+            const cfg = ENEMY_TIERS[e.tier] || {};
+            const color = cfg.color || '#fff';
+            const glow = cfg.glow ? 'text-shadow:0 0 8px rgba(255,215,0,0.9);' : '';
+            const nameHtml = `<strong style="color:${color};${glow}">${e.name}</strong>`;
+            const tierHtml = `<em style="color:${color}">${e.tier}</em>`;
+            const mapLabel = currentMap ? ` — Lieu: ${mapNameHTML(currentMap)}` : '';
+            const dungeonLabel = currentDungeon ? ` — Donjon: ${currentDungeon.dungeonId}` : '';
+            logHTML(`🐺 ${nameHtml} apparaît ! Niveau ${e.level} — Palier: ${tierHtml}${mapLabel}${dungeonLabel}`);
+        });
+    } else {
+        // spawn 1-3 enemies (map-aware)
+        const count = Math.floor(Math.random() * 3) + 1; // 1..3
+        for (let i=0;i<count;i++) {
+            let e = null;
+            // if a map is selected, prefer its unique enemies sometimes
+            if (currentMap && MAPS[currentMap]) {
+                if (Math.random() < 0.6) {
+                    e = createMapEnemy(currentMap, i);
+                }
             }
+            // fallback to generic tier enemy
+            if (!e) {
+                const tier = weightedPickEnemyTier();
+                e = createEnemyFromTier(tier, i);
+            }
+            currentEnemies.push(e);
+            // styled appearance log using tier color
+            const cfg = ENEMY_TIERS[e.tier] || {};
+            const color = cfg.color || '#fff';
+            const glow = cfg.glow ? 'text-shadow:0 0 8px rgba(255,215,0,0.9);' : '';
+            const nameHtml = `<strong style="color:${color};${glow}">${e.name}</strong>`;
+            const tierHtml = `<em style="color:${color}">${e.tier}</em>`;
+            const mapLabel = currentMap ? ` — Lieu: ${mapNameHTML(currentMap)}` : '';
+            const dungeonLabel = currentDungeon ? ` — Donjon: ${currentDungeon.dungeonId}` : '';
+            logHTML(`🐺 ${nameHtml} apparaît ! Niveau ${e.level} — Palier: ${tierHtml}${mapLabel}${dungeonLabel}`);
         }
-        // fallback to generic tier enemy
-        if (!e) {
-            const tier = weightedPickEnemyTier();
-            e = createEnemyFromTier(tier, i);
-        }
-        // if entering a dungeon, scale up stats a bit
-        if (currentDungeon) {
-            e.level = (e.level || 1) + 4;
-            e.maxHp = Math.floor((e.maxHp || e.hp) * 1.45);
-            e.hp = e.maxHp;
-            e.damage = Math.max(1, Math.floor((e.damage || 1) * 1.35));
-            e.defense = (e.defense || 0) + 1;
-        }
-        currentEnemies.push(e);
-        // styled appearance log using tier color
-        const cfg = ENEMY_TIERS[e.tier] || {};
-        const color = cfg.color || '#fff';
-        const glow = cfg.glow ? 'text-shadow:0 0 8px rgba(255,215,0,0.9);' : '';
-        const nameHtml = `<strong style="color:${color};${glow}">${e.name}</strong>`;
-        const tierHtml = `<em style="color:${color}">${e.tier}</em>`;
-        const mapLabel = currentMap ? ` — Lieu: ${mapNameHTML(currentMap)}` : '';
-        const dungeonLabel = currentDungeon ? ` — Donjon: ${currentDungeon.dungeonId}` : '';
-        logHTML(`🐺 ${nameHtml} apparaît ! Niveau ${e.level} — Palier: ${tierHtml}${mapLabel}${dungeonLabel}`);
     }
     updateStats();
 }
@@ -1158,7 +1252,9 @@ function renderMaps() {
             const dungeonId = btn.dataset.dungeon;
             if (mapId && dungeonId) {
                 currentMap = mapId;
-                currentDungeon = { mapId, dungeonId, room: 0 };
+                // generate deterministic rooms for this dungeon (seeded by mapId|dungeonId)
+                const rooms = generateDungeonRooms(mapId, dungeonId);
+                currentDungeon = { mapId, dungeonId, room: 0, rooms };
                 try { logHTML(`🚪 Vous entrez dans le donjon ${dungeonId} de ${mapNameHTML(mapId)}`); } catch(e) { log(`🚪 Vous entrez dans le donjon ${dungeonId} de ${MAPS[mapId].name}`); }
                 // close maps modal and backdrop immediately for a clean transition
                 try { toggleMaps(false); } catch(e) { try { const m = document.getElementById('maps'); if (m) { m.style.display='none'; } const b = document.getElementById('modalBackdrop'); if (b) b.style.display='none'; } catch(_) {} }
