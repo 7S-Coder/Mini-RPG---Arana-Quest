@@ -1,36 +1,60 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mini RPG - Arana Quest</title>
-
+    <title>Arena Quest — Mini MMORPG</title>
+    <meta name="theme-color" content="#1b1b1b">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <div id="playerPanel">
-        <h2>👤 Joueur</h2>
-        <p id="playerStats"></p>
-    </div>
+    <header class="site-header">
+        <div class="title-wrap">
+            <h1>Arena Quest</h1>
+            <p class="tagline">Aventure mmorp — mobile first</p>
+        </div>
+    </header>
 
-<button id="goToArena">Aller à l'arène</button>
+    <main class="container">
+        <section id="playerPanel" class="panel player">
+            <div class="player-head">
+                <h2>👤 Joueur</h2>
+                <div class="hp-bar" aria-hidden="false">
+                    <div id="hpFill" class="hp-fill"></div>
+                </div>
+            </div>
+            <p id="playerStats" class="stats"></p>
+            <p id="inventory" class="inventory"></p>
+        </section>
 
-<div id="log"></div>
+        <section class="panel arena">
+            <div class="arena-top">
+                <button id="goToArena" class="btn primary">Aller à l'arène</button>
+                <div id="enemyInfo" class="enemy-info"></div>
+            </div>
 
-<button id="attackBtn">Attaquer</button>
-<button id="runBtn">Fuir</button>
+            <div id="log" class="log" aria-live="polite"></div>
 
-<button id="openShop">Magasin</button>
-<div id="shop" style="display:none;">
-  <button data-item="sword">Acheter Épée (20 or)</button>
-  <button data-item="shield">Acheter Bouclier (15 or)</button>
-</div>
+            <div class="actions">
+                <button id="attackBtn" class="btn danger">Attaquer</button>
+                <button id="runBtn" class="btn">Fuir</button>
+            </div>
+        </section>
 
-<p id="inventory"></p>
+        <aside class="panel shopPanel">
+            <button id="openShop" class="btn">Magasin</button>
+            <div id="shop" class="shop" aria-hidden="true">
+                <button data-item="sword" class="shop-item">Acheter Épée (20 or)</button>
+                <button data-item="shield" class="shop-item">Acheter Bouclier (15 or)</button>
+            </div>
+        </aside>
+    </main>
 
+    <footer class="site-footer">Version alpha — Améliore l'interface pour mobile</footer>
 
-<script type="module" src="app.js"></script>
-    
+    <script type="module" src="app.js"></script>
 </body>
 </html>
