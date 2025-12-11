@@ -322,3 +322,13 @@ body{
   #logPanel #goToArena{display:none !important}
 }
 
+/* Reserve space for the fixed mobile controls so page content isn't hidden */
+@media(max-width:899px){
+  /* give the main container extra bottom padding equal to control height + safe-area */
+  .container, main.container { padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px)); }
+  /* panels and sidebars get a little extra breathing room */
+  .panel, .tier-legend, .enemy-info { padding-bottom: 12px; }
+  /* reduce modal max-height so it doesn't extend behind the controls */
+  .shop, #catalog, .modal { max-height: calc(100vh - 120px); }
+}
+

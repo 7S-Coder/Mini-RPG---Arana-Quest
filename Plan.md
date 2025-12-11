@@ -27,7 +27,7 @@
 [ ] - Animations (Canvas ou CSS)
 
 [ UI & CONTROLES ]
-[O] - Interface responsive mobile
+[O] - Interface responsive mobile (pas satisfait de l'affichage d'equipement sur mobile)
 [X] - Contrôles tactiles + clavier
 [ ] - Système d’achievements / badges
 

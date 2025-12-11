@@ -895,14 +895,58 @@ function toggleCatalog(show) {
 const catalogBtn = document.getElementById('openCatalogBtn');
 if (catalogBtn) catalogBtn.addEventListener('click', () => toggleCatalog());
 
+// --- Bestiary (montres) rendering and modal control ---
+function renderBestiary() {
+    const el = document.getElementById('bestiary');
+    if (!el) return;
+    let html = `<div class="bestiary-head"><h3>Bestiaire</h3><button id="closeBestiary" class="btn">Fermer</button></div>`;
+    // For each tier, show a few sample monsters
+    for (const [tierKey, cfg] of Object.entries(ENEMY_TIERS)) {
+        const color = cfg.color || '#fff';
+        const glow = getGlowStyle(cfg, { type: 'text', size: 6 });
+        html += `<div class="bestiary-tier"><h4 style="color:${color};${glow}">${tierKey.toUpperCase()}</h4>`;
+        // create 2 sample monsters per tier
+        for (let i = 0; i < 2; i++) {
+            const sample = createEnemyFromTier(tierKey, i);
+            const hp = sample.maxHp || sample.hp || 0;
+            const dmg = sample.damage || 0;
+            const def = sample.defense || 0;
+            html += `<div class="bestiary-entry"><div class="be-name">${sample.name}</div><div class="be-meta">Lvl ${sample.level} — HP ${hp} — DMG ${dmg} — DEF ${def}</div></div>`;
+        }
+        html += `</div>`;
+    }
+    el.innerHTML = html;
+    const close = document.getElementById('closeBestiary');
+    if (close) close.addEventListener('click', () => toggleBestiary(false));
+}
+
+function toggleBestiary(show) {
+    const el = document.getElementById('bestiary');
+    const btn = document.getElementById('openBestiaryBtn');
+    if (!el || !btn) return;
+    const backdrop = document.getElementById('modalBackdrop');
+    const willShow = typeof show === 'boolean' ? show : (el.style.display === 'none');
+    el.style.display = willShow ? 'block' : 'none';
+    if (backdrop) backdrop.style.display = willShow ? 'block' : 'none';
+    el.setAttribute('aria-hidden', willShow ? 'false' : 'true');
+    btn.classList.toggle('active', willShow);
+    if (willShow) renderBestiary();
+}
+
+// hook bestiary open button
+const bestiaryBtn = document.getElementById('openBestiaryBtn');
+if (bestiaryBtn) bestiaryBtn.addEventListener('click', () => toggleBestiary());
+
 // clicking backdrop closes any open modal
 const modalBackdropEl = document.getElementById('modalBackdrop');
 if (modalBackdropEl) {
     modalBackdropEl.addEventListener('click', () => {
         const shop = document.getElementById('shop');
         const catalog = document.getElementById('catalog');
+        const bestiary = document.getElementById('bestiary');
         if (shop) { shop.style.display = 'none'; shop.setAttribute('aria-hidden', 'true'); }
         if (catalog) { catalog.style.display = 'none'; catalog.setAttribute('aria-hidden', 'true'); }
+        if (bestiary) { bestiary.style.display = 'none'; bestiary.setAttribute('aria-hidden', 'true'); }
         const inv = document.getElementById('invEquipModal');
         if (inv) { inv.style.display = 'none'; inv.setAttribute('aria-hidden', 'true'); }
         modalBackdropEl.style.display = 'none';
