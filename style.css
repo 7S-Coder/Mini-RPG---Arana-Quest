@@ -211,12 +211,30 @@ body{
   .equipment-figure{display:none}
   .equipment{min-height:auto;display:block}
 
-  /* Render equip slots as a responsive grid / list instead of absolute positioning */
-  .equipment-slots{position:static;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:8px;padding:4px}
-  .equipment .equip-slot{position:relative;min-width:0;min-height:72px;padding:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:12px;background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.00));border:1px solid rgba(255,255,255,0.03);box-shadow:none}
-  .equipment .slot-name{font-size:0.78rem;color:#d6cfc1;margin-bottom:6px}
-  .equipment .slot-item{font-size:0.95rem;color:#fff}
+  /* Render equip slots as a responsive list: label above, item centered and full-width */
+  .equipment-slots{position:static;display:grid;grid-template-columns:1fr;gap:10px;margin-top:8px;padding:4px}
+  .equipment .equip-slot{position:relative;min-width:0;min-height:64px;padding:12px;display:flex;flex-direction:column;align-items:stretch;justify-content:center;border-radius:12px;background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.00));border:1px solid rgba(255,255,255,0.03);box-shadow:none}
+  /* label sits above the item */
+  .equipment .equip-slot .slot-name{flex:0 0 auto;text-align:left;padding-left:12px;margin-bottom:8px;color:#d6cfc1}
+  /* item takes full width and is centered */
+  .equipment .equip-slot .slot-item{flex:1 1 auto;text-align:center;padding:12px 10px;width:100%;box-sizing:border-box;display:block;font-size:0.95rem;color:#fff}
   .equipment .equip-slot button{margin-top:8px;padding:8px 10px;border-radius:8px;font-size:0.9rem}
+  /* Reset any absolute offsets that remain from desktop layout so slots are not shifted */
+  .equipment .slot-chapeau,
+  .equipment .slot-arme,
+  .equipment .slot-botte,
+  .equipment .slot-plastron,
+  .equipment .slot-amulette,
+  .equipment .slot-anneau,
+  .equipment .slot-ceinture,
+  .equipment .slot-artefact,
+  .equipment .slot-familliers {
+    left: auto !important;
+    top: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    transform: none !important;
+  }
 
   /* Make inventory items stack nicely and enlarge tap targets */
   .inv-item, .shop-item, .catalog-item{padding:10px;border-radius:10px;width:100%}
