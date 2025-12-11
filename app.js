@@ -42,21 +42,89 @@ const RARITIES = {
 };
 
 const ITEMS = {
-  potion:       { id: 'potion', name: 'Potion de soin', rarity: 'common', heal: 30, cost: 10 },
-  iron_sword:   { id: 'iron_sword', name: 'Épée en fer', rarity: 'rare', dmg: 3, cost: 30 },
-  dragon_blade: { id: 'dragon_blade', name: 'Lame du dragon', rarity: 'epic', dmg: 8, cost: 120 },
-  aegis_shield: { id: 'aegis_shield', name: "Bouclier d'Aegis", rarity: 'legendary', def: 6, cost: 220 },
-  mythos_core:  { id: 'mythos_core', name: 'Noyau de Mythos', rarity: 'mythic', dmg: 15, def: 8, cost: 1000 }
+    potion:       { id: 'potion', name: 'Potion de soin', rarity: 'common', type: 'artefact', heal: 30, cost: 10 },
+    
+    iron_sword:   { id: 'iron_sword', name: 'Épée en fer', rarity: 'common', type: 'arme', dmg: 3, cost: 30 },
+    dague:        { id: 'dague', name: 'Dague courte', rarity: 'common', type: 'arme', dmg: 2, cost: 12 },
+    hache:        { id: 'hache', name: 'Hache de bûcheron', rarity: 'rare', type: 'arme', dmg: 5, cost: 45 },
+    masse:        { id: 'masse', name: 'Masse lourde', rarity: 'rare', type: 'arme', dmg: 6, cost: 55 },
+    lance:        { id: 'lance', name: 'Lance', rarity: 'rare', type: 'arme', dmg: 4, cost: 40 },
+    arc:          { id: 'arc', name: 'Arc en bois', rarity: 'common', type: 'arme', dmg: 3, cost: 25 },
+    carquois:     { id: 'carquois', name: 'Carquois', rarity: 'common', type: 'artefact', ammo: 20, cost: 8 },
+
+    iron_plate:   { id: 'iron_plate', name: 'Plastron en fer', rarity: 'common', type: 'plastron', def: 3, cost: 35 },
+    bottes:       { id: 'bottes', name: 'Bottes de cuir', rarity: 'common', type: 'botte', def: 1, cost: 12 },
+    ceinture:     { id: 'ceinture', name: 'Ceinture simple', rarity: 'common', type: 'ceinture', def: 0, cost: 6 },
+    coiffe:       { id: 'coiffe', name: 'Coiffe en tissu', rarity: 'common', type: 'chapeau', def: 1, cost: 10 },
+    gantelets:    { id: 'gantelets', name: 'Gantelets', rarity: 'rare', type: 'plastron', def: 2, cost: 20 },
+    jambières:    { id: 'jambieres', name: 'Jambières', rarity: 'rare', type: 'plastron', def: 2, cost: 28 },
+    brassards:    { id: 'brassards', name: 'Brassards', rarity: 'rare', type: 'plastron', def: 1, cost: 18 },
+
+    cape:         { id: 'cape', name: 'Cape', rarity: 'epic', type: 'plastron', def: 2, cost: 90 },
+    anneau:       { id: 'anneau', name: 'Anneau simple', rarity: 'rare', type: 'anneau', bonus: 'small', cost: 40 },
+    collier:      { id: 'collier', name: 'Collier', rarity: 'rare', type: 'amulette', bonus: 'small', cost: 45 },
+    dragon_blade: { id: 'dragon_blade', name: 'Lame du dragon', rarity: 'epic', type: 'arme', dmg: 8, cost: 120 },
+    spectral_blade:{ id: 'spectral_blade', name: 'Lame Spectrale', rarity: 'epic', type: 'arme', dmg: 10, cost: 180 },
+    stormcaller_staff:{ id: 'stormcaller_staff', name: 'Bâton Stormcaller', rarity: 'epic', type: 'arme', dmg: 9, cost: 170 },
+    venom_bow:    { id: 'venom_bow', name: 'Arc du Venin', rarity: 'epic', type: 'arme', dmg: 9, cost: 160 },
+    runed_amulet: { id: 'runed_amulet', name: 'Amulette runique', rarity: 'epic', type: 'amulette', bonus: 'mana', cost: 140 },
+    ghost_hood:   { id: 'ghost_hood', name: 'Capuche des spectres', rarity: 'epic', type: 'chapeau', def: 2, cost: 130 },
+    boots_of_swift:{ id: 'boots_of_swift', name: 'Bottes de Rapidité', rarity: 'epic', type: 'botte', def: 1, bonus: 'speed', cost: 125 },
+
+    soulrender:   { id: 'soulrender', name: 'Tranche-âmes', rarity: 'legendary', type: 'arme', dmg: 14, cost: 480 },
+    aegis_plate:  { id: 'aegis_plate', name: "Plastron d'Aegis", rarity: 'legendary', type: 'plastron', def: 10, cost: 520 },
+    phoenix_feather:{ id: 'phoenix_feather', name: 'Plume du Phénix', rarity: 'legendary', type: 'plastron', bonus: 'revive', cost: 600 },
+    ring_of_eternity:{ id: 'ring_of_eternity', name: 'Anneau de l’Éternité', rarity: 'legendary', type: 'anneau', bonus: 'hpregen', cost: 450 },
+
+    mythos_core:  { id: 'mythos_core', name: 'Noyau de Mythos', rarity: 'mythic', type: 'artefact', dmg: 15, def: 8, cost: 1000 },
+    orb_of_ages:   { id: 'orb_of_ages', name: 'Orbe des Âges', rarity: 'mythic', type: 'artefact', bonus: 'time', cost: 2000 },
+    void_relic:    { id: 'void_relic', name: 'Relique du Vide', rarity: 'mythic', type: 'artefact', bonus: 'void', cost: 2500 },
+    celestial_crown:{ id: 'celestial_crown', name: 'Couronne Céleste', rarity: 'mythic', type: 'chapeau', bonus: 'divine', cost: 3000 }
 };
 
 // Catalogue des objets pouvant être dropés en jeu (utilisez les clés correspondant à `ITEMS`)
 const DROPPABLE_ITEMS = [
-    'potion',
-    'iron_sword',
-    'dragon_blade',
-    'aegis_shield',
-    'mythos_core'
+    'potion', 'dague', 'iron_sword', 'hache', 'masse', 'lance', 'arc', 'carquois',
+    'iron_plate', 'bottes', 'ceinture', 'coiffe', 'gantelets', 'jambieres', 'brassards',
+    'cape', 'anneau', 'collier', 'dragon_blade', 'spectral_blade', 'stormcaller_staff', 'venom_bow', 'runed_amulet', 'ghost_hood', 'boots_of_swift',
+    'soulrender', 'aegis_plate', 'phoenix_feather', 'ring_of_eternity', 'aegis_shield',
+    'mythos_core', 'orb_of_ages', 'void_relic', 'celestial_crown'
 ];
+
+// Drop rates per rarity (absolute probability per enemy killed for that rarity)
+// You requested: common 30%, epic 8%, legendary 1%, mythic 0.2%.
+// We'll set `rare` to 12% by default so overall drop chance remains reasonable.
+const RARITY_DROP_RATES = {
+    common: 0.30,
+    rare:   0.12,
+    epic:   0.08,
+    legendary: 0.01,
+    mythic: 0.002
+};
+
+function sumObjectValues(obj) {
+    return Object.values(obj).reduce((s, v) => s + (typeof v === 'number' ? v : 0), 0);
+}
+
+// Compute per-item absolute drop probability: P(item) = P(rarity) * (1 / count_of_items_of_that_rarity)
+function getItemDropRate(key) {
+    const item = ITEMS[key];
+    if (!item) return 0;
+    const rarity = item.rarity || 'common';
+    const rateForRarity = RARITY_DROP_RATES[rarity] || 0;
+    // count how many droppable items are of this rarity
+    let count = 0;
+    DROPPABLE_ITEMS.forEach(k => { const it = ITEMS[k]; if (it && it.rarity === rarity) count++; });
+    if (count <= 0) return 0;
+    return rateForRarity / count;
+}
+
+// Pick a random item from a given rarity (uniform among items of that rarity)
+function pickItemByRarity(rarity) {
+    const list = DROPPABLE_ITEMS.filter(k => ITEMS[k] && ITEMS[k].rarity === rarity).map(k => ITEMS[k]);
+    if (!list.length) return null;
+    return list[Math.floor(Math.random() * list.length)];
+}
 
 // Weighted random picker for items by rarity
 function pickRandomItem() {
@@ -192,10 +260,19 @@ document.getElementById('attackBtn').addEventListener('click', () => {
         const goldGain = randInt(4, 14); // example: 4-14 gold
         log(`💀 ${currentEnemy.name} vaincu ! Vous gagnez ${xpGain} XP et ${goldGain} or.`);
         player.xp += xpGain; player.gold += goldGain;
-        // small chance to drop an item (very low)
-        const DROP_CHANCE = 0.2; // 20% chance
-        if (Math.random() < DROP_CHANCE) {
-            const dropped = pickRandomItem();
+        // decide drop by rarity probabilities
+        const totalDrop = sumObjectValues(RARITY_DROP_RATES);
+        if (Math.random() < totalDrop) {
+            // pick a rarity based on absolute rates
+            const r = Math.random() * totalDrop;
+            let acc = 0;
+            let chosenRarity = null;
+            for (const [rk, rv] of Object.entries(RARITY_DROP_RATES)) {
+                acc += rv;
+                if (r <= acc) { chosenRarity = rk; break; }
+            }
+            if (!chosenRarity) chosenRarity = 'common';
+            const dropped = pickItemByRarity(chosenRarity) || pickRandomItem();
             if (dropped) {
                 player.inventory.push({ id: dropped.id, name: dropped.name, rarity: dropped.rarity });
                 log(`🎁 ${currentEnemy.name} lâche : ${dropped.name} (${dropped.rarity})`);
@@ -306,7 +383,13 @@ function renderDroppableCatalog() {
         const r = RARITIES[it.rarity] || { color: 'white' };
         const glow = r.glow ? 'text-shadow:0 0 6px rgba(255,215,0,0.8);' : '';
         const style = `color:${r.color};${glow}`;
-        return `<div class="catalog-item"><strong style="${style}">${it.name}</strong> — <em>${it.rarity}</em> ${it.heal ? `(+${it.heal} HP)` : ''}</div>`;
+        const simpleType = getSimpleType(it);
+        const typeLabel = simpleType ? ` <span class="item-type">(${simpleType})</span>` : '';
+        const extra = it.heal ? `(+${it.heal} HP)` : (it.dmg ? `(DMG ${it.dmg})` : (it.def ? `(DEF ${it.def})` : ''));
+        const rate = getItemDropRate(key);
+        const pct = (rate * 100).toFixed(3).replace(/\.000$/, '');
+        const rateLabel = ` <span class="drop-rate">Taux de drop: ${pct}%</span>`;
+        return `<div class="catalog-item"><strong style="${style}">${it.name}</strong> ${typeLabel} — <em>${it.rarity}</em> ${extra}${rateLabel}</div>`;
     }).join('');
     el.innerHTML = `<div class="catalog-head"><h3>Catalogue des drops</h3><button id="closeCatalog" class="btn">Fermer</button></div>${html}`;
     // wire close button
@@ -329,6 +412,22 @@ function toggleCatalog(show) {
 // hook catalog open button
 const catalogBtn = document.getElementById('openCatalogBtn');
 if (catalogBtn) catalogBtn.addEventListener('click', () => toggleCatalog());
+
+// Simplify types to the requested set: arme, botte, ceinture, amulette, anneau, plastron, chapeau, artefact
+function getSimpleType(def) {
+    const t = (def.type || '').toString().toLowerCase();
+    // prefer explicit mapping based on properties
+    if (def.rarity === 'mythic' || t === 'artifact' || t === 'artefact') return 'artefact';
+    if (t.includes('weapon') || t.includes('ranged') || t.includes('staff') || def.dmg) return 'arme';
+    if (t.includes('boot') || t.includes('boots') || t === 'botte') return 'botte';
+    if (t.includes('belt') || t.includes('ceinture')) return 'ceinture';
+    if (t.includes('neck') || t.includes('amulet') || t.includes('runed') || t === 'ammo') return 'amulette';
+    if (t.includes('ring') || t === 'anneau') return 'anneau';
+    if (t.includes('chest') || t.includes('plate') || t.includes('plastron')) return 'plastron';
+    if (t.includes('head') || t.includes('hood') || t.includes('coiffe') || t.includes('crown')) return 'chapeau';
+    // fallback: map consumables and others to 'artefact' to avoid showing irrelevant types
+    return 'artefact';
+}
 
 // load saved player if present (before first save in updateStats)
 let _hadSaved = false;
