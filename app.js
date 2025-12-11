@@ -158,37 +158,24 @@ const MAPS = {
             { id: 'grotte_souterraine', name: 'Grotte Souterraine', rooms: 4 },
             { id: 'ruines_anciennes', name: 'Ruines Anciennes', rooms: 4 }
         ]
+    },
+    crater_noir: {
+        id: 'crater_noir',
+        name: "Cratère Noir",
+        description: "Un ancien cratère fumant, où la terre est fracturée et les cendres volent.",
+        uniqueEnemies: [
+            { name: 'Charognard ardent', tier: 'common', baseHp: 30, damage: 5, defense: 1 },
+            { name: 'Golem de lave', tier: 'rare', baseHp: 72, damage: 12, defense: 4 },
+            { name: 'Cendre spectrale', tier: 'epic', baseHp: 48, damage: 9, defense: 2 }
+        ],
+        theme: { color: '#e74c3c', glow: true, glowColor: 'rgba(231,76,60,0.9)' },
+        lootPool: [ 'potion', 'iron_sword', 'hache', 'dragon_blade', 'phoenix_feather', 'venom_bow' ],
+        dungeons: [
+            { id: 'fournaise', name: 'La Fournaise', rooms: 3 },
+            { id: 'antre_du_braise', name: 'Antre du Braise', rooms: 5 }
+        ]
     }
 };
-
-let currentMap = null; // e.g. 'forest_of_dawn'
-let currentDungeon = null; // e.g. { mapId, dungeonId, roomIndex }
-
-function createMapEnemy(mapId, index) {
-    try {
-        const map = MAPS[mapId];
-        if (!map) return null;
-        // 60% chance to pick a map-unique enemy (if any), otherwise pick from global tier pools but treat it as map-local
-        if (Array.isArray(map.uniqueEnemies) && map.uniqueEnemies.length > 0 && Math.random() < 0.6) {
-            const def = map.uniqueEnemies[Math.floor(Math.random() * map.uniqueEnemies.length)];
-            const name = `${def.name} #${index+1}`;
-            const hp = def.baseHp || Math.max(12, 18 + (Math.random()*12|0));
-            const dmg = def.damage || Math.max(1, Math.floor(hp/8));
-            const e = new Enemy(name, Math.floor(hp), dmg);
-            e.maxHp = Math.floor(hp);
-            e.tier = def.tier || 'common';
-            e.level = (ENEMY_TIERS[e.tier] && ENEMY_TIERS[e.tier].levelMin) ? randInt(ENEMY_TIERS[e.tier].levelMin, ENEMY_TIERS[e.tier].levelMax) : 1;
-            e.defense = def.defense || def.def || 0;
-            e.originMap = mapId;
-            return e;
-        }
-        // fallback: pick a tier and create a standard enemy, but mark as originating from this map
-        const tier = weightedPickEnemyTier();
-        const e = createEnemyFromTier(tier, index);
-        if (e) e.originMap = mapId;
-        return e;
-    } catch (e) { console.warn('createMapEnemy', e); return null; }
-}
 
 // --- Deterministic dungeon room generation ---
 // simple string hash to produce a 32-bit seed
@@ -540,6 +527,9 @@ function checkLevelUp() {
 
 const player = new Player();
 let currentEnemies = [];
+// current location state (map / dungeon)
+let currentMap = null; // e.g. 'forest_of_dawn'
+let currentDungeon = null; // e.g. { mapId, dungeonId, roomIndex }
 
 // LocalStorage key
 const STORAGE_KEY = 'tpgame_player_v1';
@@ -1170,8 +1160,24 @@ function renderBestiary() {
         } else {
             html += `<div class="muted">Aucun monstre unique listé pour cette map.</div>`;
         }
-        // samples from global pools merged into this map's pool
+        // pool local: include unique enemies + samples from global pools
         html += `<div class="bestiary-local-pool"><strong>Pool local (exemples)</strong>`;
+        // list unique enemies first (if any)
+        if (Array.isArray(mapCfg.uniqueEnemies) && mapCfg.uniqueEnemies.length) {
+            html += `<div class="bestiary-unique-pool"><em>Ennemis de la map</em>`;
+            mapCfg.uniqueEnemies.forEach((ue, ui) => {
+                const name = ue.name || `Monstre ${ui+1}`;
+                const tier = ue.tier || 'common';
+                const hp = ue.baseHp || ue.hp || '—';
+                const dmg = ue.damage || ue.dmg || '—';
+                const def = ue.defense || ue.def || 0;
+                const r = ENEMY_TIERS[tier] || {};
+                const glow = getGlowStyle(r, { type: 'text', size: 6 });
+                html += `<div class="bestiary-entry"><div class="be-name" style="color:${r.color || '#fff'};${glow}">${name}</div><div class="be-meta">${tier} — HP ${hp} — DMG ${dmg} — DEF ${def}</div></div>`;
+            });
+            html += `</div>`;
+        }
+        // then show samples merged from global pools
         for (const [tierKey, cfg] of Object.entries(ENEMY_TIERS)) {
             const names = GLOBAL_ENEMY_POOLS[tierKey] || [];
             if (!names.length) continue;
@@ -1244,6 +1250,8 @@ function renderMaps() {
                 currentDungeon = null;
                 try { logHTML(`🗺️ Vous entrez dans la map: ${mapNameHTML(id)}`); } catch(e) { log(`🗺️ Vous entrez dans la map: ${MAPS[id].name}`); }
                 try { applyMapThemeToLog(currentMap); } catch(e){}
+                // close maps modal for a clean transition
+                try { toggleMaps(false); } catch(e) { try { const m = document.getElementById('maps'); if (m) m.style.display='none'; const b = document.getElementById('modalBackdrop'); if (b) b.style.display='none'; } catch(_) {} }
                 try { savePlayer(); } catch(e){}
                 newEncounter();
             }
@@ -1276,7 +1284,13 @@ function toggleMaps(show) {
     if (backdrop) backdrop.style.display = willShow ? 'block' : 'none';
     el.setAttribute('aria-hidden', willShow ? 'false' : 'true');
     btn.classList.toggle('active', willShow);
-    if (willShow) renderMaps();
+    if (willShow) {
+        // set modal index to currentMap if possible
+        const keys = Object.keys(MAPS);
+        const idx = Math.max(0, keys.indexOf(currentMap));
+        window._mapsModalIndex = idx >= 0 ? idx : 0;
+        renderMaps();
+    }
 }
 
 const mapsBtn = document.getElementById('openMapsBtn');
