@@ -386,7 +386,8 @@ function createEnemyFromTier(tier, index) {
     // to the average level for its tier. This keeps monsters consistent for all players.
     const avgTierLevel = Math.max(1, Math.floor((cfg.levelMin + cfg.levelMax) / 2));
     const lvlRatio = level / avgTierLevel;
-    const tierMul = { common: 1, rare: 1.08, epic: 1.18, legendary: 1.35, mythic: 1.7 }[tier] || 1;
+    // ensure 'epic' enemies are stronger than 'rare' (epic > rare)
+    const tierMul = { common: 1, rare: 1.08, epic: 1.25, legendary: 1.35, mythic: 1.7 }[tier] || 1;
     let extraMul = 1.0;
     if (lvlRatio >= 2) extraMul = 1.75;
     else if (lvlRatio >= 1.5) extraMul = 1.3;
@@ -465,7 +466,8 @@ function createMapEnemy(mapId, index) {
     const tierCfg = ENEMY_TIERS[e.tier] || { levelMin: 1, levelMax: 1 };
     const avgTierLevel = Math.max(1, Math.floor((tierCfg.levelMin + tierCfg.levelMax) / 2));
     const lvlRatio = e.level / avgTierLevel;
-    const tierMul = { common: 1, rare: 1.08, epic: 1.18, legendary: 1.35, mythic: 1.7 }[e.tier] || 1;
+    // ensure 'epic' enemies are stronger than 'rare' (epic > rare)
+    const tierMul = { common: 1, rare: 1.08, epic: 1.25, legendary: 1.35, mythic: 1.7 }[e.tier] || 1;
     let extraMul = 1.0;
     if (lvlRatio >= 2) extraMul = 1.75;
     else if (lvlRatio >= 1.5) extraMul = 1.3;
@@ -1978,6 +1980,17 @@ function endCombatCleanup(reason) {
     // clear enemies and enemy display
     currentEnemies = [];
     renderEnemyInfo();
+
+    // If the familiar died during combat, revive it now (restore to max HP and re-enable its attack)
+    try {
+        if (player.familiarMaxHp && player.familiarMaxHp > 0 && (!player.familiarHp || player.familiarHp <= 0)) {
+            player.familiarHp = player.familiarMaxHp;
+            // recalc equipment to restore familiarAttack from equipped familiar
+            try { recalcStatsFromEquipment(); } catch(e) { /* ignore */ }
+            log(`✨ ${player.familiarName || 'Votre familier'} revient à la vie après le combat !`);
+            try { savePlayer(); } catch(e) {}
+        }
+    } catch (e) { console.warn('revive familiar on endCombatCleanup', e); }
 
     // After a short delay, clear the log to keep the UI clean and show a ready message
     setTimeout(() => {
