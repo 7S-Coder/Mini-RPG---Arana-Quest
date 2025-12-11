@@ -35,6 +35,53 @@ class Enemy {
 const player = new Player();
 let currentEnemy = null;
 
+// LocalStorage key
+const STORAGE_KEY = 'tpgame_player_v1';
+
+function randInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function savePlayer() {
+    try {
+        const payload = {
+            name: player.name,
+            hp: player.hp,
+            maxHp: player.maxHp,
+            damage: player.damage,
+            defense: player.defense,
+            xp: player.xp,
+            lvl: player.lvl,
+            gold: player.gold,
+            inventory: player.inventory
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    } catch (e) {
+        console.warn('Impossible de sauvegarder le player', e);
+    }
+}
+
+function loadPlayer() {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        const data = JSON.parse(raw);
+        if (!data) return;
+        // assign saved values to current player object
+        player.name = data.name ?? player.name;
+        player.hp = typeof data.hp === 'number' ? data.hp : player.hp;
+        player.maxHp = typeof data.maxHp === 'number' ? data.maxHp : player.maxHp;
+        player.damage = typeof data.damage === 'number' ? data.damage : player.damage;
+        player.defense = typeof data.defense === 'number' ? data.defense : player.defense;
+        player.xp = typeof data.xp === 'number' ? data.xp : player.xp;
+        player.lvl = typeof data.lvl === 'number' ? data.lvl : player.lvl;
+        player.gold = typeof data.gold === 'number' ? data.gold : player.gold;
+        player.inventory = Array.isArray(data.inventory) ? data.inventory : player.inventory;
+    } catch (e) {
+        console.warn('Impossible de charger le player depuis localStorage', e);
+    }
+}
+
 function renderHPBar() {
     const el = document.getElementById('hpFill');
     if (!el) return;
@@ -49,6 +96,8 @@ function updateStats() {
     renderHPBar();
     updateInventory();
     renderEnemyInfo();
+    // persist progress automatically whenever stats update
+    savePlayer();
 }
 
 function renderEnemyInfo() {
@@ -76,8 +125,11 @@ document.getElementById('attackBtn').addEventListener('click', () => {
     currentEnemy.hp -= player.damage;
     log(`⚔️ Vous infligez ${player.damage} dégâts à ${currentEnemy.name}`);
     if (currentEnemy.hp <= 0) {
-        log(`💀 ${currentEnemy.name} vaincu ! Vous gagnez 10 XP et 8 or.`);
-        player.xp += 10; player.gold += 8;
+        // randomize rewards
+        const xpGain = randInt(6, 16); // example: 6-16 xp
+        const goldGain = randInt(4, 14); // example: 4-14 gold
+        log(`💀 ${currentEnemy.name} vaincu ! Vous gagnez ${xpGain} XP et ${goldGain} or.`);
+        player.xp += xpGain; player.gold += goldGain;
         // cleanup UI after victory
         endCombatCleanup('victoire');
         return;
@@ -137,6 +189,8 @@ document.querySelectorAll('#shop button').forEach(btn => {
         player.inventory.push(item.name);
         log(`🛒 Vous achetez : ${item.name}`);
         updateStats();
+        // save occurs in updateStats but ensure immediate persistence
+        savePlayer();
     });
 });
 
