@@ -32,6 +32,58 @@ class Enemy {
     }
 }
 
+// Rarities and item catalog
+const RARITIES = {
+  common:    { color: "white", weight: 70 },
+  rare:      { color: "blue", weight: 18 },
+  epic:      { color: "pink", weight: 8 },
+  legendary: { color: "yellow", weight: 3 },
+  mythic:    { color: "gold", glow: true, weight: 1 }
+};
+
+const ITEMS = {
+  potion:       { id: 'potion', name: 'Potion de soin', rarity: 'common', heal: 30, cost: 10 },
+  iron_sword:   { id: 'iron_sword', name: 'Épée en fer', rarity: 'rare', dmg: 3, cost: 30 },
+  dragon_blade: { id: 'dragon_blade', name: 'Lame du dragon', rarity: 'epic', dmg: 8, cost: 120 },
+  aegis_shield: { id: 'aegis_shield', name: "Bouclier d'Aegis", rarity: 'legendary', def: 6, cost: 220 },
+  mythos_core:  { id: 'mythos_core', name: 'Noyau de Mythos', rarity: 'mythic', dmg: 15, def: 8, cost: 1000 }
+};
+
+// Weighted random picker for items by rarity
+function pickRandomItem() {
+    // build weighted list of item keys according to rarity weights
+    const weighted = [];
+    Object.values(ITEMS).forEach(item => {
+        const r = RARITIES[item.rarity] || { weight: 0 };
+        const w = Math.max(0, r.weight || 0);
+        for (let i=0;i<w;i++) weighted.push(item);
+    });
+    if (!weighted.length) return null;
+    const pick = weighted[Math.floor(Math.random() * weighted.length)];
+    return pick;
+}
+
+// Global use function so inline onclick can call it from the DOM
+function useItem(index) {
+    const it = player.inventory[index];
+    if (!it) { log('ℹ️ Item introuvable.'); return; }
+    // legacy support if inventory stored strings
+    const id = typeof it === 'string' ? it : it.id;
+    const itemDef = ITEMS[id] || (typeof it === 'object' && ITEMS[it.id]) || null;
+    if (!itemDef) { log(`ℹ️ Impossible d'utiliser cet objet (${id}).`); return; }
+    if (itemDef.heal) {
+        const heal = itemDef.heal;
+        const before = player.hp;
+        player.hp = Math.min(player.maxHp, player.hp + heal);
+        log(`🧪 Vous utilisez ${itemDef.name} et récupérez ${player.hp - before} HP.`);
+        player.inventory.splice(index, 1);
+        updateStats();
+        return;
+    }
+    log(`ℹ️ ${itemDef.name} ne peut pas être utilisé pour l'instant.`);
+}
+window.useItem = useItem;
+
 const player = new Player();
 let currentEnemy = null;
 
@@ -130,6 +182,16 @@ document.getElementById('attackBtn').addEventListener('click', () => {
         const goldGain = randInt(4, 14); // example: 4-14 gold
         log(`💀 ${currentEnemy.name} vaincu ! Vous gagnez ${xpGain} XP et ${goldGain} or.`);
         player.xp += xpGain; player.gold += goldGain;
+        // small chance to drop an item (very low)
+        const DROP_CHANCE = 0.2; // 20% chance
+        if (Math.random() < DROP_CHANCE) {
+            const dropped = pickRandomItem();
+            if (dropped) {
+                player.inventory.push({ id: dropped.id, name: dropped.name, rarity: dropped.rarity });
+                log(`🎁 ${currentEnemy.name} lâche : ${dropped.name} (${dropped.rarity})`);
+            }
+        }
+
         // cleanup UI after victory
         endCombatCleanup('victoire');
         return;
@@ -173,21 +235,31 @@ document.getElementById('openShop').addEventListener('click', () => {
 });
 
 const shopItems = {
-    sword: { name: 'Épée', dmg: 5, cost: 20 },
-    shield: { name: 'Bouclier', def: 3, cost: 15 }
+    sword:  { id: 'iron_sword', name: 'Épée', cost: 30 },
+    shield: { id: 'aegis_shield', name: 'Bouclier', cost: 220 },
+    potion: { id: 'potion', name: 'Potion', cost: 10 }
 };
 
 document.querySelectorAll('#shop button').forEach(btn => {
     btn.addEventListener('click', () => {
         const key = btn.dataset.item;
-        const item = shopItems[key];
-        if (!item) return;
-        if (player.gold < item.cost) { log("❌ Pas assez d'or !"); return; }
-        player.gold -= item.cost;
-        if (item.dmg) player.damage += item.dmg;
-        if (item.def) player.defense += item.def;
-        player.inventory.push(item.name);
-        log(`🛒 Vous achetez : ${item.name}`);
+        const entry = shopItems[key];
+        if (!entry) return;
+        if (player.gold < entry.cost) { log("❌ Pas assez d'or !"); return; }
+        player.gold -= entry.cost;
+        // if entry references ITEMS, apply its stats
+        if (entry.id && ITEMS[entry.id]) {
+            const def = ITEMS[entry.id];
+            if (def.dmg) player.damage += def.dmg;
+            if (def.def) player.defense += def.def;
+            // store a lightweight object in inventory
+            player.inventory.push({ id: def.id, name: def.name, rarity: def.rarity });
+            log(`🛒 Vous achetez : ${def.name}`);
+        } else {
+            // fallback
+            player.inventory.push({ id: entry.name, name: entry.name, rarity: 'common' });
+            log(`🛒 Vous achetez : ${entry.name}`);
+        }
         updateStats();
         // save occurs in updateStats but ensure immediate persistence
         savePlayer();
@@ -197,7 +269,20 @@ document.querySelectorAll('#shop button').forEach(btn => {
 function updateInventory() {
     const el = document.getElementById('inventory');
     if (!el) return;
-    el.textContent = 'Inventaire : ' + (player.inventory.length ? player.inventory.join(', ') : 'vide');
+    if (!player.inventory || player.inventory.length === 0) {
+        el.textContent = 'Inventaire : vide';
+        return;
+    }
+    el.innerHTML = 'Inventaire : ' + player.inventory.map((it, i) => {
+        if (typeof it === 'string') return `<span>${it}</span>`;
+        const def = ITEMS[it.id] || it;
+        const rarity = def.rarity || 'common';
+        const r = RARITIES[rarity] || { color: 'white' };
+        const glow = r.glow ? 'text-shadow:0 0 6px rgba(255,215,0,0.8);' : '';
+        const style = `color:${r.color};${glow}`;
+        const useBtn = def.heal ? ` <button onclick="useItem(${i})">Utiliser</button>` : '';
+        return `<span style="${style}">${def.name}</span>${useBtn}`;
+    }).join(', ');
 }
 
 // load saved player if present (before first save in updateStats)
