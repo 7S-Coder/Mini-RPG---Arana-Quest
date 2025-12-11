@@ -268,3 +268,39 @@ body{
 /* Accessibility and small touches */
 .btn:focus{outline:2px solid rgba(255,255,255,0.06);outline-offset:2px}
 
+/* Combat visual effects */
+.enemy-card{position:relative}
+.damage-float{position:absolute;right:12px;top:8px;background:rgba(0,0,0,0.6);color:#fff;padding:6px 8px;border-radius:8px;font-weight:800;font-size:0.95rem;pointer-events:none;z-index:2200;opacity:0}
+.damage-float.enemy-damage{background:linear-gradient(90deg,rgba(180,40,40,0.95),rgba(220,80,80,0.95));}
+.damage-float.player-damage{right:12px;top:12px;background:linear-gradient(90deg,rgba(120,20,20,0.95),rgba(180,40,40,0.95));}
+
+@keyframes floatUp { from { transform: translateY(0); opacity:1 } to { transform: translateY(-28px); opacity:0 } }
+.damage-float{animation: floatUp 700ms ease-out forwards}
+
+@keyframes shakeX { 0% { transform: translateX(0) } 25% { transform: translateX(-6px) } 50% { transform: translateX(6px) } 75% { transform: translateX(-3px) } 100% { transform: translateX(0) } }
+.enemy-card.shake{animation: shakeX 360ms ease-in-out}
+
+/* enemy killed pulse */
+.enemy-card.enemy-dead{animation: enemyDead 520ms ease-out forwards}
+@keyframes enemyDead { 0% { transform: scale(1); opacity:1 } 60% { transform: scale(1.08); opacity:1 } 100% { transform: scale(0.92); opacity:0.12 } }
+
+/* player hit highlight on hp bar */
+.hp-bar.player-hit{box-shadow:0 0 14px rgba(255,40,40,0.9) inset; animation: hpFlash 420ms ease-out}
+@keyframes hpFlash { 0% { box-shadow:0 0 30px rgba(255,80,80,0.95) inset } 100% { box-shadow:0 0 6px rgba(255,40,40,0.6) inset } }
+
+/* small kill burst icon */
+.kill-burst{position:absolute;left:50%;top:30%;transform:translate(-50%,-50%);font-size:20px;z-index:2300;animation: burst 520ms ease-out forwards}
+@keyframes burst { 0% { transform:translate(-50%,-50%) scale(0.4); opacity:1 } 60% { transform:translate(-50%,-60%) scale(1.2); opacity:1 } 100% { transform:translate(-50%,-80%) scale(1); opacity:0 } }
+
+/* Level up effect */
+.levelup-badge{position:fixed;left:50%;top:18%;transform:translateX(-50%) translateY(-10px) scale(0.92);background:linear-gradient(90deg,#ffd36b,#ffd36b 50%,#ffd36b);color:#111;padding:12px 18px;border-radius:12px;font-weight:900;z-index:2500;box-shadow:0 12px 36px rgba(255,200,90,0.12);opacity:0}
+.levelup-badge.show{animation: levelUpIn 900ms cubic-bezier(.2,.9,.2,1) forwards}
+@keyframes levelUpIn { 0% { transform:translateX(-50%) translateY(-10px) scale(0.92); opacity:0 } 40% { transform:translateX(-50%) translateY(0) scale(1.12); opacity:1 } 100% { transform:translateX(-50%) translateY(-6px) scale(1); opacity:1 } }
+
+.player-panel-pulse{animation: playerPulse 900ms ease-out}
+@keyframes playerPulse { 0% { transform:scale(1) } 30% { transform:scale(1.06) } 100% { transform:scale(1) } }
+
+/* Confetti simple particles (DOM based) */
+.confetti-piece{position:fixed;width:8px;height:10px;border-radius:2px;z-index:2499;opacity:0;pointer-events:none}
+@keyframes confettiFall { 0% { transform:translateY(-10vh) rotate(0deg); opacity:1 } 100% { transform:translateY(80vh) rotate(720deg); opacity:0 } }
+

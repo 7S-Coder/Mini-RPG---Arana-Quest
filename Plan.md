@@ -1,6 +1,6 @@
 [ GAMEPLAY & PROGRESSION ]
 [ ] - Scores persistants (localStorage)
-[ ] - Système de niveaux et progression
+[X] - Système de niveaux et progression
 [ ] - Modes de difficulté dynamiques
 [ ] - Système de quêtes
 [ ] - Boss uniques
@@ -12,11 +12,11 @@
 [ ] - Power[ ] -ups ramassables
 [X] - Items avec raretés (commun → mythique)
 [ ] - Deep crafting (forge + améliorations)
-[ ] - Inventaire et équipement
+[X] - Inventaire et équipement
 
 [ COMBAT & IA ]
-[ ] - Ajout de monstres variés
-[ ] - Combats multi[ ] -enemis
+[X] - Ajout de monstres variés
+[X] - Combats multi[ ] -enemis
 [ ] - IA ennemie améliorée (patrouille, poursuite, états)
 [ ] - Effets élémentaires et statuts (burn, freeze, slow)
 
@@ -27,8 +27,8 @@
 [ ] - Animations (Canvas ou CSS)
 
 [ UI & CONTROLES ]
-[ ] - Interface responsive mobile
-[ ] - Contrôles tactiles + clavier
+[O] - Interface responsive mobile
+[X] - Contrôles tactiles + clavier
 [ ] - Système d’achievements / badges
 
 [ MULTI & PERSISTANCE ]

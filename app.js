@@ -337,6 +337,7 @@ function checkLevelUp() {
     if (leveled) {
         // reapply equipment modifiers on top of new base stats
         recalcStatsFromEquipment();
+        try { showLevelUp(player.lvl); } catch(e) {}
         // persist and refresh UI (but avoid infinite recursion: updateStats will still render)
         savePlayer();
     }
@@ -521,8 +522,12 @@ document.getElementById('attackBtn').addEventListener('click', () => {
     const target = currentEnemies[targetIndex];
     const actualDamage = Math.max(1, player.damage - (target.defense || 0));
     target.hp -= actualDamage;
+    // visual feedback
+    showDamageOnEnemy(targetIndex, actualDamage);
     log(`⚔️ Vous infligez ${actualDamage} dégâts à ${target.name} (def ${target.defense || 0})`);
     if (target.hp <= 0) {
+        // show kill effect
+        showEnemyKill(targetIndex);
         // reward for this kill
         // XP: base roll scaled by enemy level and rarity multiplier
         const baseXp = randInt(6, 16);
@@ -570,8 +575,10 @@ document.getElementById('attackBtn').addEventListener('click', () => {
         const famName = player.familiarName || 'Votre familier';
         const famDamage = Math.max(1, Math.floor(player.familiarAttack));
         target.hp -= famDamage;
+        showDamageOnEnemy(targetIndex, famDamage);
         log(`🐾 ${famName} inflige ${famDamage} dégâts à ${target.name}.`);
         if (target.hp <= 0) {
+            showEnemyKill(targetIndex);
             // reward for this kill (same logic as player kill)
             const baseXp2 = randInt(6, 16);
             const levelFactor2 = 1 + (target.level || 1) / 10;
@@ -616,8 +623,10 @@ document.getElementById('attackBtn').addEventListener('click', () => {
         const attacker = alive[Math.floor(Math.random() * alive.length)];
         const edmg = Math.max(0, attacker.damage - player.defense);
         player.hp -= edmg;
+        showDamageOnPlayer(edmg);
         log(`🛡️ ${attacker.name} riposte et inflige ${edmg} dégâts.`);
         if (player.hp <= 0) {
+            showPlayerDeath();
             // Respawn: restore HP to max and end combat
             player.hp = player.maxHp;
             log('☠️ Vous êtes mort. Vous ressuscitez et récupérez vos PV au maximum.');
@@ -640,13 +649,15 @@ document.getElementById('runBtn').addEventListener('click', () => {
         if (alive.length > 0) {
             const attacker = alive[Math.floor(Math.random() * alive.length)];
             const edmg = Math.max(0, attacker.damage - player.defense);
-            player.hp -= edmg;
-            if (player.hp <= 0) {
-                player.hp = player.maxHp;
-                log('☠️ Vous êtes mort. Vous ressuscitez et récupérez vos PV au maximum.');
-                endCombatCleanup('mort');
-                return;
-            }
+                player.hp -= edmg;
+                showDamageOnPlayer(edmg);
+                if (player.hp <= 0) {
+                    showPlayerDeath();
+                    player.hp = player.maxHp;
+                    log('☠️ Vous êtes mort. Vous ressuscitez et récupérez vos PV au maximum.');
+                    endCombatCleanup('mort');
+                    return;
+                }
         }
     }
     updateStats();
@@ -1005,4 +1016,112 @@ function addTouchClick(el, handler) {
 addTouchClick(document.getElementById('mobileAttack'), () => { const b = document.getElementById('attackBtn'); if (b) b.click(); });
 addTouchClick(document.getElementById('mobileRun'), () => { const b = document.getElementById('runBtn'); if (b) b.click(); });
 addTouchClick(document.getElementById('mobileArena'), () => { const b = document.getElementById('goToArena'); if (b) b.click(); });
+
+// --- Combat visual helpers ---
+function showDamageOnEnemy(index, amount) {
+    try {
+        const card = document.querySelector(`.enemy-card[data-index="${index}"]`);
+        if (!card) return;
+        // add shake
+        card.classList.remove('shake');
+        // force reflow to restart animation
+        void card.offsetWidth;
+        card.classList.add('shake');
+        const dmgEl = document.createElement('div');
+        dmgEl.className = 'damage-float enemy-damage';
+        dmgEl.textContent = `-${amount}`;
+        card.appendChild(dmgEl);
+        dmgEl.addEventListener('animationend', () => dmgEl.remove());
+        setTimeout(() => card.classList.remove('shake'), 500);
+    } catch (e) { console.warn('showDamageOnEnemy', e); }
+}
+
+function showDamageOnPlayer(amount) {
+    try {
+        const panel = document.getElementById('playerPanel');
+        const hp = document.querySelector('.hp-bar');
+        if (hp) {
+            hp.classList.remove('player-hit');
+            void hp.offsetWidth;
+            hp.classList.add('player-hit');
+            setTimeout(() => hp.classList.remove('player-hit'), 600);
+        }
+        if (!panel) return;
+        const dmgEl = document.createElement('div');
+        dmgEl.className = 'damage-float player-damage';
+        dmgEl.style.right = '12px';
+        dmgEl.style.top = '12px';
+        dmgEl.textContent = `-${amount}`;
+        panel.appendChild(dmgEl);
+        dmgEl.addEventListener('animationend', () => dmgEl.remove());
+    } catch (e) { console.warn('showDamageOnPlayer', e); }
+}
+
+function showEnemyKill(index) {
+    try {
+        const card = document.querySelector(`.enemy-card[data-index="${index}"]`);
+        if (!card) return;
+        card.classList.add('enemy-dead');
+        const burst = document.createElement('div');
+        burst.className = 'kill-burst';
+        burst.textContent = '💥';
+        card.appendChild(burst);
+        burst.addEventListener('animationend', () => burst.remove());
+        setTimeout(() => card.classList.remove('enemy-dead'), 700);
+    } catch (e) { console.warn('showEnemyKill', e); }
+}
+
+function showPlayerDeath() {
+    try {
+        const panel = document.getElementById('playerPanel');
+        if (!panel) return;
+        panel.classList.add('player-dead');
+        // quick flash
+        const hp = document.querySelector('.hp-bar');
+        if (hp) { hp.classList.add('player-hit'); setTimeout(() => hp.classList.remove('player-hit'), 900); }
+        setTimeout(() => panel.classList.remove('player-dead'), 900);
+    } catch (e) { console.warn('showPlayerDeath', e); }
+}
+
+// --- Level up visuals ---
+function showLevelUp(newLevel) {
+    try {
+        // badge
+        const existing = document.querySelector('.levelup-badge');
+        if (existing) existing.remove();
+        const badge = document.createElement('div');
+        badge.className = 'levelup-badge';
+        badge.textContent = `🎉 Niveau ${newLevel} !`;
+        document.body.appendChild(badge);
+        // force reflow then show
+        void badge.offsetWidth;
+        badge.classList.add('show');
+        // pulse player panel
+        const playerPanel = document.getElementById('playerPanel');
+        if (playerPanel) {
+            playerPanel.classList.add('player-panel-pulse');
+            setTimeout(() => playerPanel.classList.remove('player-panel-pulse'), 900);
+        }
+        // confetti (simple DOM particles)
+        const colors = ['#ffd36b','#ff9aa2','#9ee6ff','#c8ffb3','#f4c1ff'];
+        const pieces = [];
+        for (let i=0;i<10;i++) {
+            const p = document.createElement('div');
+            p.className = 'confetti-piece';
+            p.style.background = colors[i%colors.length];
+            p.style.left = (50 + (Math.random()-0.5)*40) + 'vw';
+            p.style.top = (10 + Math.random()*6) + 'vh';
+            p.style.transform = `rotate(${Math.random()*360}deg)`;
+            p.style.opacity = '1';
+            document.body.appendChild(p);
+            // start animation
+            const dur = 800 + Math.floor(Math.random()*600);
+            p.style.animation = `confettiFall ${dur}ms cubic-bezier(.2,.7,.2,1) forwards`;
+            pieces.push(p);
+        }
+        // cleanup
+        setTimeout(() => { badge.classList.remove('show'); setTimeout(()=>badge.remove(),400); }, 2200);
+        setTimeout(() => { pieces.forEach(px=>px.remove()); }, 2000);
+    } catch (e) { console.warn('showLevelUp error', e); }
+}
 
