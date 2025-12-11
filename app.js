@@ -559,7 +559,24 @@ function updateStats() {
     // apply any pending level ups first
     checkLevelUp();
     const neededXP = xpToNextLevel(player.lvl);
-    const s = `HP: ${player.hp}/${player.maxHp}\nNiveau: ${player.lvl}  XP: ${player.xp}/${neededXP}xp\nDégâts: ${player.damage}  Défense: ${player.defense}\nOr: ${player.gold}`;
+    let s = `HP: ${player.hp}/${player.maxHp}\nNiveau: ${player.lvl}  XP: ${player.xp}/${neededXP}xp\nDégâts: ${player.damage}  Défense: ${player.defense}\nOr: ${player.gold}`;
+    // show current location: dungeon with room progress or current map
+    try {
+        if (currentDungeon && typeof currentDungeon === 'object') {
+            const mapId = currentDungeon.mapId || currentDungeon.map || currentMap || null;
+            const dungeonId = currentDungeon.dungeonId || currentDungeon.dungeon || 'unknown';
+            const mapCfg = MAPS[mapId] || null;
+            const dungeonCfg = mapCfg && Array.isArray(mapCfg.dungeons) ? mapCfg.dungeons.find(d => d.id === dungeonId) : null;
+            const totalRooms = (dungeonCfg && dungeonCfg.rooms) ? dungeonCfg.rooms : 0;
+            const roomIndex = (typeof currentDungeon.room === 'number') ? currentDungeon.room : 0;
+            const displayRoom = totalRooms > 0 ? `${Math.min(roomIndex + 1, totalRooms)}/${totalRooms}` : `${roomIndex + 1}`;
+            const dName = dungeonCfg ? dungeonCfg.name : dungeonId;
+            s += `\nDonjon: ${dName} — Salle ${displayRoom}`;
+        } else if (currentMap) {
+            const mName = MAPS[currentMap] ? MAPS[currentMap].name : currentMap;
+            s += `\nLieu: ${mName}`;
+        }
+    } catch (e) { /* ignore UI location errors */ }
     const statsEl = document.getElementById('playerStats');
     if (statsEl) statsEl.textContent = s;
     renderHPBar();
@@ -1143,6 +1160,8 @@ function renderMaps() {
                 currentMap = mapId;
                 currentDungeon = { mapId, dungeonId, room: 0 };
                 try { logHTML(`🚪 Vous entrez dans le donjon ${dungeonId} de ${mapNameHTML(mapId)}`); } catch(e) { log(`🚪 Vous entrez dans le donjon ${dungeonId} de ${MAPS[mapId].name}`); }
+                // close maps modal and backdrop immediately for a clean transition
+                try { toggleMaps(false); } catch(e) { try { const m = document.getElementById('maps'); if (m) { m.style.display='none'; } const b = document.getElementById('modalBackdrop'); if (b) b.style.display='none'; } catch(_) {} }
                 try { applyMapThemeToLog(currentMap); } catch(e){}
                 try { savePlayer(); } catch(e){}
                 newEncounter();
@@ -1274,6 +1293,56 @@ function endCombatCleanup(reason) {
     if (catalogEl) {
         catalogEl.style.display = 'none';
         catalogEl.setAttribute('aria-hidden', 'true');
+    }
+
+    // If we are in a dungeon, handle room progression
+    if (currentDungeon) {
+        try {
+            const mapId = currentDungeon.mapId;
+            const dungeonId = currentDungeon.dungeonId;
+            const mapCfg = MAPS[mapId];
+            const dungeonCfg = mapCfg && Array.isArray(mapCfg.dungeons) ? mapCfg.dungeons.find(d => d.id === dungeonId) : null;
+            const totalRooms = (dungeonCfg && dungeonCfg.rooms) ? dungeonCfg.rooms : 0;
+            // on victory, advance room index; else (flee/death) abandon the dungeon
+            if (reason === 'victoire') {
+                currentDungeon.room = (typeof currentDungeon.room === 'number' ? currentDungeon.room : 0) + 1;
+                // still more rooms to clear
+                if (currentDungeon.room < totalRooms) {
+                    logHTML(`🔦 Vous progressez dans le donjon — Salle ${currentDungeon.room + 1} / ${totalRooms}`);
+                    try { savePlayer(); } catch (e) {}
+                    try { applyMapThemeToLog(mapId); } catch (e) {}
+                    // small delay before next room
+                    setTimeout(() => { try { newEncounter(); } catch (e) { console.warn(e); } }, 600);
+                    return; // skip the usual cleanup reset so the next encounter runs
+                }
+                // finished the dungeon
+                const rooms = Math.max(1, totalRooms || 1);
+                const goldReward = 20 * rooms;
+                const xpReward = 25 * rooms;
+                player.gold += goldReward;
+                player.xp += xpReward;
+                // give a bonus item from the map pool if available
+                let bonusItem = null;
+                if (mapCfg && Array.isArray(mapCfg.lootPool) && mapCfg.lootPool.length) {
+                    const id = mapCfg.lootPool[Math.floor(Math.random() * mapCfg.lootPool.length)];
+                    bonusItem = ITEMS[id] || null;
+                    if (bonusItem) player.inventory.push({ id: bonusItem.id, name: bonusItem.name, rarity: bonusItem.rarity });
+                }
+                logHTML(`🏆 Donjon terminé ! Récompense : ${xpReward} XP, ${goldReward} or${bonusItem ? ` et <strong>${bonusItem.name}</strong>` : ''}.`);
+                // clear dungeon state
+                currentDungeon = null;
+                try { savePlayer(); } catch (e) {}
+                try { applyMapThemeToLog(mapId); } catch (e) {}
+                // continue cleanup below to reset UI and clear enemies
+            } else {
+                // failed to progress (fuite/mort) — leave the dungeon
+                logHTML(`↩️ Vous quittez le donjon (${reason}).`);
+                currentDungeon = null;
+                try { savePlayer(); } catch (e) {}
+                try { applyMapThemeToLog(currentMap); } catch (e) {}
+                // continue cleanup below
+            }
+        } catch (e) { console.warn('Dungeon progression error', e); }
     }
 
     // clear enemies and enemy display
