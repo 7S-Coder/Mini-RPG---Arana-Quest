@@ -19,6 +19,15 @@
     </header>
 
     <main class="container">
+        <section id="logPanel" class="panel log-panel">
+            <div id="log" class="log" aria-live="polite"></div>
+            <div class="log-controls" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                <button id="goToArena" class="btn primary">Aller à l'arène</button>
+                <button id="attackBtn" class="btn danger">Attaquer</button>
+                <button id="runBtn" class="btn">Fuir</button>
+            </div>
+        </section>
+
         <section id="playerPanel" class="panel player">
             <div class="player-head">
                 <h2>👤 Joueur</h2>
@@ -40,21 +49,13 @@
             </div>
         </section>
 
-        <section class="panel arena">
+        <section id="arenaPanel" class="panel arena">
             <div class="arena-top">
-                <button id="goToArena" class="btn primary">Aller à l'arène</button>
                 <div id="enemyInfo" class="enemy-info"></div>
-            </div>
-
-            <div id="log" class="log" aria-live="polite"></div>
-
-            <div class="actions">
-                <button id="attackBtn" class="btn danger">Attaquer</button>
-                <button id="runBtn" class="btn">Fuir</button>
             </div>
         </section>
 
-        <aside class="panel shopPanel">
+        <aside id="shopPanel" class="panel shopPanel">
             <button id="openShop" class="btn">Magasin</button>
             <button id="openCatalogBtn" class="btn">Catalogue</button>
             <div id="shop" class="shop" aria-hidden="true"></div>
