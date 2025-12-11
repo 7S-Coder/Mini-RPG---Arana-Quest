@@ -229,6 +229,11 @@ body{
   .modal-close{right:14px;top:12px;font-size:1.3rem}
 }
 
+/* Remove body padding on mobile to use full viewport space */
+@media(max-width:899px){
+  body{padding:0}
+}
+
 /* Tier legend */
 .tier-legend{margin-top:12px;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.02)}
 .tier-legend h4{margin:0 0 6px 0;font-size:0.85rem;color:#e9e6da}
@@ -303,4 +308,10 @@ body{
 /* Confetti simple particles (DOM based) */
 .confetti-piece{position:fixed;width:8px;height:10px;border-radius:2px;z-index:2499;opacity:0;pointer-events:none}
 @keyframes confettiFall { 0% { transform:translateY(-10vh) rotate(0deg); opacity:1 } 100% { transform:translateY(80vh) rotate(720deg); opacity:0 } }
+
+/* Hide log buttons on small screens: keep only the bottom mobile controls */
+@media(max-width:899px){
+  #logPanel .log-controls{display:none !important}
+  #logPanel #goToArena{display:none !important}
+}
 
