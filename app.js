@@ -131,6 +131,123 @@ const ENEMY_TIERS = {
     mythic:    { weight: 2,  levelMin: 60, levelMax: 100, color: '#ff4d4d', glow: true, glowColor: 'rgba(255,80,80,0.95)' }
 };
 
+// Global name pools extracted so maps can include them in their own enemy pools
+const GLOBAL_ENEMY_POOLS = {
+    common: ['Gobelin','Slime','Loup','Rôdeur','Squelette','Bouftou'],
+    rare: ['Brigand','Ogre','Warg','Garde','Satyre','Maraudeur'],
+    epic: ['Chasseur sombre','Golem','Wyrm','Nécromancien','Rôdeur ancien'],
+    legendary: ['Seigneur du Fléau','Géant de pierre','Drake','Chevalier noir'],
+    mythic: ['Ancien Primordial','Dragon Ancien','Titan','Démon Primordial']
+};
+
+// --- Maps definition: first map with unique mobs and two dungeons (4 rooms each) ---
+const MAPS = {
+    forest_of_dawn: {
+        id: 'forest_of_dawn',
+        name: "Forêt de l'Aube",
+        description: "Une forêt brumeuse où l'on rencontre des créatures endémiques.",
+        uniqueEnemies: [
+            { name: 'Lynx des brumes', tier: 'rare', baseHp: 36, damage: 6, defense: 2 },
+            { name: 'Dryade mineure', tier: 'common', baseHp: 24, damage: 4, defense: 1 },
+            { name: 'Esprit sylvestre', tier: 'epic', baseHp: 58, damage: 9, defense: 3 }
+        ],
+        // visual theme for the map (used in logs and bestiary rendering)
+        theme: { color: '#2ecc71', glow: true, glowColor: 'rgba(46,204,113,0.9)' },
+        lootPool: [ 'potion', 'dague', 'bottes', 'coiffe', 'anneau', 'collier' ],
+        dungeons: [
+            { id: 'grotte_souterraine', name: 'Grotte Souterraine', rooms: 4 },
+            { id: 'ruines_anciennes', name: 'Ruines Anciennes', rooms: 4 }
+        ]
+    }
+};
+
+let currentMap = null; // e.g. 'forest_of_dawn'
+let currentDungeon = null; // e.g. { mapId, dungeonId, roomIndex }
+
+function createMapEnemy(mapId, index) {
+    try {
+        const map = MAPS[mapId];
+        if (!map) return null;
+        // 60% chance to pick a map-unique enemy (if any), otherwise pick from global tier pools but treat it as map-local
+        if (Array.isArray(map.uniqueEnemies) && map.uniqueEnemies.length > 0 && Math.random() < 0.6) {
+            const def = map.uniqueEnemies[Math.floor(Math.random() * map.uniqueEnemies.length)];
+            const name = `${def.name} #${index+1}`;
+            const hp = def.baseHp || Math.max(12, 18 + (Math.random()*12|0));
+            const dmg = def.damage || Math.max(1, Math.floor(hp/8));
+            const e = new Enemy(name, Math.floor(hp), dmg);
+            e.maxHp = Math.floor(hp);
+            e.tier = def.tier || 'common';
+            e.level = (ENEMY_TIERS[e.tier] && ENEMY_TIERS[e.tier].levelMin) ? randInt(ENEMY_TIERS[e.tier].levelMin, ENEMY_TIERS[e.tier].levelMax) : 1;
+            e.defense = def.defense || def.def || 0;
+            e.originMap = mapId;
+            return e;
+        }
+        // fallback: pick a tier and create a standard enemy, but mark as originating from this map
+        const tier = weightedPickEnemyTier();
+        const e = createEnemyFromTier(tier, index);
+        if (e) e.originMap = mapId;
+        return e;
+    } catch (e) { console.warn('createMapEnemy', e); return null; }
+}
+
+// convert hex color like '#aabbcc' to {r,g,b}
+function hexToRgb(hex) {
+    if (!hex) return null;
+    try {
+        let h = hex.replace('#','').trim();
+        if (h.length === 3) h = h.split('').map(c=>c+c).join('');
+        const v = parseInt(h,16);
+        if (Number.isNaN(v)) return null;
+        return { r: (v >> 16) & 255, g: (v >> 8) & 255, b: v & 255 };
+    } catch(e){ return null; }
+}
+
+// Apply the map theme color as a subtle background to the log area
+function applyMapThemeToLog(mapId) {
+    try {
+        const el = document.getElementById('log');
+        if (!el) return;
+        const map = MAPS[mapId];
+        if (!map || !map.theme || !map.theme.color) {
+            el.style.background = '';
+            return;
+        }
+        const theme = map.theme;
+        const rgb = hexToRgb(theme.color) || null;
+        const alpha = typeof theme.opacity === 'number' ? theme.opacity : 0.06;
+        let stop = '';
+        if (rgb) stop = `rgba(${rgb.r},${rgb.g},${rgb.b},${alpha})`;
+        else stop = theme.color;
+        // subtle gradient using the theme color at small opacity
+        el.style.background = `linear-gradient(180deg, ${stop}, rgba(0,0,0,0))`;
+    } catch (e) { console.warn('applyMapThemeToLog', e); }
+}
+
+// Return styled HTML for a map name using its theme (fallback to plain text)
+function mapNameHTML(mapId) {
+    try {
+        const m = MAPS[mapId];
+        if (!m) return (mapId || 'Unknown');
+        const theme = m.theme || {};
+        const color = theme.color || '#fff';
+        const glow = getGlowStyle(theme, { type: 'text', size: 6 });
+        return `<span style="color:${color};${glow}">${m.name}</span>`;
+    } catch (e) { return MAPS[mapId] ? MAPS[mapId].name : mapId; }
+}
+
+// Pick an item from a map-specific loot pool by rarity
+function pickMapItemByRarity(mapId, rarity) {
+    try {
+        if (!mapId) return null;
+        const map = MAPS[mapId];
+        if (!map || !Array.isArray(map.lootPool) || map.lootPool.length === 0) return null;
+        const candidates = map.lootPool.filter(id => ITEMS[id] && (ITEMS[id].rarity || 'common') === rarity);
+        if (candidates.length === 0) return null;
+        const id = candidates[Math.floor(Math.random() * candidates.length)];
+        return ITEMS[id] || null;
+    } catch (e) { console.warn('pickMapItemByRarity', e); return null; }
+}
+
 function sumWeights(obj) {
     return Object.values(obj).reduce((s, v) => s + (v.weight || 0), 0);
 }
@@ -149,15 +266,7 @@ function weightedPickEnemyTier() {
 function createEnemyFromTier(tier, index) {
     const cfg = ENEMY_TIERS[tier] || ENEMY_TIERS.common;
     const level = randInt(cfg.levelMin, cfg.levelMax);
-    // choose name pools per tier
-    const pools = {
-        common: ['Gobelin','Slime','Loup','Rôdeur','Squelette','Bouftou'],
-        rare: ['Brigand','Ogre','Warg','Garde','Satyre','Maraudeur'],
-        epic: ['Chasseur sombre','Golem','Wyrm','Nécromancien','Rôdeur ancien'],
-        legendary: ['Seigneur du Fléau','Géant de pierre','Drake','Chevalier noir'],
-        mythic: ['Ancien Primordial','Dragon Ancien','Titan','Démon Primordial']
-    };
-    const names = pools[tier] || pools.common;
+    const names = GLOBAL_ENEMY_POOLS[tier] || GLOBAL_ENEMY_POOLS.common;
     const baseName = names[Math.floor(Math.random() * names.length)];
     const name = `${baseName} #${index+1}`;
     // HP/défense/dégâts scaling: non-linéaire pour rendre les niveaux supérieurs significativement plus dangereux
@@ -379,6 +488,9 @@ function savePlayer() {
             gold: player.gold,
             inventory: player.inventory,
             equipment: player.equipment
+            // persist current location (map / dungeon)
+            , currentMap: currentMap || null,
+            currentDungeon: currentDungeon || null
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     } catch (e) {
@@ -412,6 +524,11 @@ function loadPlayer() {
                 player.equipment[k] = data.equipment[k] ?? null;
             });
         }
+        // restore current map / dungeon if saved
+        try {
+            if (data.currentMap) currentMap = data.currentMap;
+            if (data.currentDungeon) currentDungeon = data.currentDungeon;
+        } catch(e) { /* ignore malformed saved location */ }
     } catch (e) {
         console.warn('Impossible de charger le player depuis localStorage', e);
     }
@@ -491,13 +608,30 @@ function renderTierLegend() {
 renderTierLegend();
 
 function newEncounter() {
-    // spawn 1-3 enemies
-    const names = ['Bouftou','Gobelin','Loup','Slime','Squelette','Rôdeur'];
+    // spawn 1-3 enemies (map-aware)
     const count = Math.floor(Math.random() * 3) + 1; // 1..3
     currentEnemies = [];
     for (let i=0;i<count;i++) {
-        const tier = weightedPickEnemyTier();
-        const e = createEnemyFromTier(tier, i);
+        let e = null;
+        // if a map is selected, prefer its unique enemies sometimes
+        if (currentMap && MAPS[currentMap]) {
+            if (Math.random() < 0.6) {
+                e = createMapEnemy(currentMap, i);
+            }
+        }
+        // fallback to generic tier enemy
+        if (!e) {
+            const tier = weightedPickEnemyTier();
+            e = createEnemyFromTier(tier, i);
+        }
+        // if entering a dungeon, scale up stats a bit
+        if (currentDungeon) {
+            e.level = (e.level || 1) + 4;
+            e.maxHp = Math.floor((e.maxHp || e.hp) * 1.45);
+            e.hp = e.maxHp;
+            e.damage = Math.max(1, Math.floor((e.damage || 1) * 1.35));
+            e.defense = (e.defense || 0) + 1;
+        }
         currentEnemies.push(e);
         // styled appearance log using tier color
         const cfg = ENEMY_TIERS[e.tier] || {};
@@ -505,7 +639,9 @@ function newEncounter() {
         const glow = cfg.glow ? 'text-shadow:0 0 8px rgba(255,215,0,0.9);' : '';
         const nameHtml = `<strong style="color:${color};${glow}">${e.name}</strong>`;
         const tierHtml = `<em style="color:${color}">${e.tier}</em>`;
-        logHTML(`🐺 ${nameHtml} apparaît ! Niveau ${e.level} — Palier: ${tierHtml}`);
+        const mapLabel = currentMap ? ` — Lieu: ${mapNameHTML(currentMap)}` : '';
+        const dungeonLabel = currentDungeon ? ` — Donjon: ${currentDungeon.dungeonId}` : '';
+        logHTML(`🐺 ${nameHtml} apparaît ! Niveau ${e.level} — Palier: ${tierHtml}${mapLabel}${dungeonLabel}`);
     }
     updateStats();
 }
@@ -550,7 +686,9 @@ document.getElementById('attackBtn').addEventListener('click', () => {
                 if (r <= acc) { chosenRarity = rk; break; }
             }
             if (!chosenRarity) chosenRarity = 'common';
-            const dropped = pickItemByRarity(chosenRarity) || pickRandomItem();
+            // try map-specific loot first (enemy may carry originMap)
+            const mapId = target.originMap || currentMap;
+            const dropped = (pickMapItemByRarity(mapId, chosenRarity) || pickItemByRarity(chosenRarity) || pickRandomItem());
             if (dropped) {
                 player.inventory.push({ id: dropped.id, name: dropped.name, rarity: dropped.rarity });
                 const rDef = RARITIES[dropped.rarity] || { color: 'white' };
@@ -600,7 +738,8 @@ document.getElementById('attackBtn').addEventListener('click', () => {
                     if (r2 <= acc2) { chosenRarity2 = rk2; break; }
                 }
                 if (!chosenRarity2) chosenRarity2 = 'common';
-                const dropped2 = pickItemByRarity(chosenRarity2) || pickRandomItem();
+                const mapId2 = target.originMap || currentMap;
+                const dropped2 = (pickMapItemByRarity(mapId2, chosenRarity2) || pickItemByRarity(chosenRarity2) || pickRandomItem());
                 if (dropped2) {
                     player.inventory.push({ id: dropped2.id, name: dropped2.name, rarity: dropped2.rarity });
                     log(`🎁 ${target.name} lâche : ${dropped2.name} (${dropped2.rarity})`);
@@ -900,19 +1039,45 @@ function renderBestiary() {
     const el = document.getElementById('bestiary');
     if (!el) return;
     let html = `<div class="bestiary-head"><h3>Bestiaire</h3><button id="closeBestiary" class="btn">Fermer</button></div>`;
-    // For each tier, show a few sample monsters
-    for (const [tierKey, cfg] of Object.entries(ENEMY_TIERS)) {
-        const color = cfg.color || '#fff';
-        const glow = getGlowStyle(cfg, { type: 'text', size: 6 });
-        html += `<div class="bestiary-tier"><h4 style="color:${color};${glow}">${tierKey.toUpperCase()}</h4>`;
-        // create 2 sample monsters per tier
-        for (let i = 0; i < 2; i++) {
-            const sample = createEnemyFromTier(tierKey, i);
-            const hp = sample.maxHp || sample.hp || 0;
-            const dmg = sample.damage || 0;
-            const def = sample.defense || 0;
-            html += `<div class="bestiary-entry"><div class="be-name">${sample.name}</div><div class="be-meta">Lvl ${sample.level} — HP ${hp} — DMG ${dmg} — DEF ${def}</div></div>`;
+    // Per-map pools: include unique enemies and samples from global pools
+    for (const [mapId, mapCfg] of Object.entries(MAPS)) {
+        html += `<div class="bestiary-map"><h4>${mapCfg.name}</h4><div class="map-desc">${mapCfg.description || ''}</div>`;
+        // unique enemies
+        if (Array.isArray(mapCfg.uniqueEnemies) && mapCfg.uniqueEnemies.length) {
+            html += `<div class="bestiary-unique"><strong>Ennemis uniques</strong>`;
+            mapCfg.uniqueEnemies.forEach((ue, idx) => {
+                const name = ue.name || `Monstre ${idx+1}`;
+                const tier = ue.tier || 'common';
+                const hp = ue.baseHp || ue.hp || '—';
+                const dmg = ue.damage || ue.dmg || '—';
+                const def = ue.defense || ue.def || 0;
+                const r = ENEMY_TIERS[tier] || {};
+                const glow = getGlowStyle(r, { type: 'text', size: 6 });
+                html += `<div class="bestiary-entry"><div class="be-name" style="color:${r.color || '#fff'};${glow}">${name}</div><div class="be-meta">${tier} — HP ${hp} — DMG ${dmg} — DEF ${def}</div></div>`;
+            });
+            html += `</div>`;
+        } else {
+            html += `<div class="muted">Aucun monstre unique listé pour cette map.</div>`;
         }
+        // samples from global pools merged into this map's pool
+        html += `<div class="bestiary-local-pool"><strong>Pool local (exemples)</strong>`;
+        for (const [tierKey, cfg] of Object.entries(ENEMY_TIERS)) {
+            const names = GLOBAL_ENEMY_POOLS[tierKey] || [];
+            if (!names.length) continue;
+            const r = cfg || {};
+            const glow = getGlowStyle(r, { type: 'text', size: 6 });
+            html += `<div class="bestiary-tier"><h5 style="color:${r.color || '#fff'};${glow}">${tierKey.toUpperCase()}</h5>`;
+            // show up to 2 examples from this tier
+            for (let i = 0; i < Math.min(2, names.length); i++) {
+                const sample = createEnemyFromTier(tierKey, i);
+                const hp = sample.maxHp || sample.hp || 0;
+                const dmg = sample.damage || 0;
+                const def = sample.defense || 0;
+                html += `<div class="bestiary-entry"><div class="be-name">${sample.name}</div><div class="be-meta">Lvl ${sample.level} — HP ${hp} — DMG ${dmg} — DEF ${def}</div></div>`;
+            }
+            html += `</div>`;
+        }
+        html += `</div>`;
         html += `</div>`;
     }
     el.innerHTML = html;
@@ -937,6 +1102,71 @@ function toggleBestiary(show) {
 const bestiaryBtn = document.getElementById('openBestiaryBtn');
 if (bestiaryBtn) bestiaryBtn.addEventListener('click', () => toggleBestiary());
 
+// --- Maps UI: render and toggle ---
+function renderMaps() {
+    const el = document.getElementById('maps');
+    if (!el) return;
+    let html = `<div class="maps-head"><h3>Maps</h3><button id="closeMaps" class="btn">Fermer</button></div>`;
+    for (const [mid, m] of Object.entries(MAPS)) {
+        html += `<div class="map-entry"><strong>${m.name}</strong><div class="map-desc">${m.description || ''}</div><div style="margin-top:6px;"><button class="btn" data-action="enter-map" data-id="${mid}">Entrer</button></div>`;
+        if (Array.isArray(m.dungeons) && m.dungeons.length) {
+            html += `<div class="map-dungeons" style="margin-top:8px"><em>Donjons:</em>`;
+            m.dungeons.forEach(d => {
+                html += `<div style="margin-top:6px;display:flex;gap:8px;align-items:center"><div style="flex:1">${d.name} — ${d.rooms} salles</div><button class="btn" data-action="enter-dungeon" data-map="${mid}" data-dungeon="${d.id}">Entrer donjon</button></div>`;
+            });
+            html += `</div>`;
+        }
+        html += `</div>`;
+    }
+    el.innerHTML = html;
+    const close = document.getElementById('closeMaps');
+    if (close) close.addEventListener('click', () => toggleMaps(false));
+    // delegation for enter buttons
+    el.addEventListener('click', (ev) => {
+        const btn = ev.target.closest('button[data-action]');
+        if (!btn) return;
+        const action = btn.dataset.action;
+        if (action === 'enter-map') {
+            const id = btn.dataset.id;
+            if (id) {
+                currentMap = id;
+                currentDungeon = null;
+                try { logHTML(`🗺️ Vous entrez dans la map: ${mapNameHTML(id)}`); } catch(e) { log(`🗺️ Vous entrez dans la map: ${MAPS[id].name}`); }
+                try { applyMapThemeToLog(currentMap); } catch(e){}
+                try { savePlayer(); } catch(e){}
+                newEncounter();
+            }
+        } else if (action === 'enter-dungeon') {
+            const mapId = btn.dataset.map;
+            const dungeonId = btn.dataset.dungeon;
+            if (mapId && dungeonId) {
+                currentMap = mapId;
+                currentDungeon = { mapId, dungeonId, room: 0 };
+                try { logHTML(`🚪 Vous entrez dans le donjon ${dungeonId} de ${mapNameHTML(mapId)}`); } catch(e) { log(`🚪 Vous entrez dans le donjon ${dungeonId} de ${MAPS[mapId].name}`); }
+                try { applyMapThemeToLog(currentMap); } catch(e){}
+                try { savePlayer(); } catch(e){}
+                newEncounter();
+            }
+        }
+    });
+}
+
+function toggleMaps(show) {
+    const el = document.getElementById('maps');
+    const btn = document.getElementById('openMapsBtn');
+    if (!el || !btn) return;
+    const backdrop = document.getElementById('modalBackdrop');
+    const willShow = typeof show === 'boolean' ? show : (el.style.display === 'none');
+    el.style.display = willShow ? 'block' : 'none';
+    if (backdrop) backdrop.style.display = willShow ? 'block' : 'none';
+    el.setAttribute('aria-hidden', willShow ? 'false' : 'true');
+    btn.classList.toggle('active', willShow);
+    if (willShow) renderMaps();
+}
+
+const mapsBtn = document.getElementById('openMapsBtn');
+if (mapsBtn) mapsBtn.addEventListener('click', () => toggleMaps());
+
 // clicking backdrop closes any open modal
 const modalBackdropEl = document.getElementById('modalBackdrop');
 if (modalBackdropEl) {
@@ -944,9 +1174,11 @@ if (modalBackdropEl) {
         const shop = document.getElementById('shop');
         const catalog = document.getElementById('catalog');
         const bestiary = document.getElementById('bestiary');
+        const maps = document.getElementById('maps');
         if (shop) { shop.style.display = 'none'; shop.setAttribute('aria-hidden', 'true'); }
         if (catalog) { catalog.style.display = 'none'; catalog.setAttribute('aria-hidden', 'true'); }
         if (bestiary) { bestiary.style.display = 'none'; bestiary.setAttribute('aria-hidden', 'true'); }
+        if (maps) { maps.style.display = 'none'; maps.setAttribute('aria-hidden', 'true'); }
         const inv = document.getElementById('invEquipModal');
         if (inv) { inv.style.display = 'none'; inv.setAttribute('aria-hidden', 'true'); }
         modalBackdropEl.style.display = 'none';
@@ -1013,6 +1245,19 @@ try { _hadSaved = !!localStorage.getItem(STORAGE_KEY); } catch(e) { _hadSaved = 
 loadPlayer();
 if (_hadSaved) 
 updateStats();
+
+// Ensure player starts in the first map by default
+if (!currentMap) {
+    currentMap = 'forest_of_dawn';
+    try { logHTML(`🗺️ Vous arrivez dans la map: ${mapNameHTML(currentMap)}`); } catch (e) {}
+    // spawn initial encounter for the starting map
+    try { newEncounter(); } catch (e) {}
+}
+// apply theme to the log for the starting map
+try { applyMapThemeToLog(currentMap); } catch (e) {}
+
+// persist the inferred starting map/dungeon if none existed before
+try { savePlayer(); } catch(e) {}
 
 // Cleanup UI at the end of a combat (victory or successful flee)
 function endCombatCleanup(reason) {

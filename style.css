@@ -125,6 +125,9 @@ body{
   padding:8px 10px;border-radius:8px;color:#e6e7e3;font-size:0.9rem;
 }
 
+/* Smooth background transition when map theme is applied */
+#log{transition:background 600ms ease;border-radius:8px}
+
 .log-line.muted{opacity:0.85;color:#bfbdb5;background:transparent;font-style:italic}
 
 .actions{display:flex;gap:10px;margin-top:10px}

@@ -6,6 +6,7 @@
 [ ] - Boss uniques
 [ ] - Dons de sorts / compétences
 [ ] - Système d’éléments (feu, glace, poison)
+[ ] - Différentes map
 [X] - Familiers
 
 [ ITEMS & AMÉLIORATIONS ]
