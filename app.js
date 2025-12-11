@@ -115,7 +115,11 @@ const ITEMS = {
     mythos_core:  { id: 'mythos_core', name: 'Noyau de Mythos', rarity: 'mythic', type: 'artefact', dmg: 15, def: 8, cost: 1000 },
     orb_of_ages:   { id: 'orb_of_ages', name: 'Orbe des Âges', rarity: 'mythic', type: 'artefact', bonus: 'time', cost: 2000 },
     void_relic:    { id: 'void_relic', name: 'Relique du Vide', rarity: 'mythic', type: 'artefact', bonus: 'void', cost: 2500 },
-    celestial_crown:{ id: 'celestial_crown', name: 'Couronne Céleste', rarity: 'mythic', type: 'chapeau', bonus: 'divine', cost: 3000 }
+    celestial_crown:{ id: 'celestial_crown', name: 'Couronne Céleste', rarity: 'mythic', type: 'chapeau', bonus: 'divine', cost: 3000 },
+    /* Familiers */
+    pet_dragon:   { id: 'pet_dragon', name: 'Dragon familier', rarity: 'epic', type: 'familliers', famAttack: 6, def: 2, cost: 800 },
+    pet_dog:      { id: 'pet_dog', name: 'Chien fidèle', rarity: 'rare', type: 'familliers', famAttack: 2, def: 1, cost: 120 }
+
 };
 
 // Enemy tiers for difficulty scaling (levels and spawn weights)
@@ -174,7 +178,8 @@ const DROPPABLE_ITEMS = [
     'iron_plate', 'bottes', 'ceinture', 'coiffe', 'gantelets', 'jambieres', 'brassards',
     'cape', 'anneau', 'collier', 'dragon_blade', 'spectral_blade', 'stormcaller_staff', 'venom_bow', 'runed_amulet', 'ghost_hood', 'boots_of_swift',
     'soulrender', 'aegis_plate', 'phoenix_feather', 'ring_of_eternity', 'aegis_shield',
-    'mythos_core', 'orb_of_ages', 'void_relic', 'celestial_crown'
+    'mythos_core', 'orb_of_ages', 'void_relic', 'celestial_crown',
+    /* familiers */ 'pet_dragon', 'pet_dog'
 ];
 
 // Drop rates per rarity (absolute probability per enemy killed for that rarity)
@@ -290,12 +295,20 @@ function recalcStatsFromEquipment() {
     // start from player's base values
     player.damage = typeof player.baseDamage === 'number' ? player.baseDamage : 10;
     player.defense = typeof player.baseDefense === 'number' ? player.baseDefense : 5;
+    // reset familiar attack info
+    player.familiarAttack = 0;
+    player.familiarName = null;
     Object.values(player.equipment).forEach(eid => {
         if (!eid) return;
         const def = ITEMS[eid];
         if (!def) return;
         if (def.dmg) player.damage += def.dmg;
         if (def.def) player.defense += def.def;
+        // accumulate familiar attack if this item is a familier
+        if (def.famAttack) {
+            player.familiarAttack += def.famAttack;
+            if (!player.familiarName && def.name) player.familiarName = def.name;
+        }
     });
 }
 
@@ -546,6 +559,51 @@ document.getElementById('attackBtn').addEventListener('click', () => {
         }
         updateStats();
         return;
+    }
+
+    // familiers attack with the player (after player hit, if target still alive)
+    if (player.familiarAttack && player.familiarAttack > 0) {
+        const famName = player.familiarName || 'Votre familier';
+        const famDamage = Math.max(1, Math.floor(player.familiarAttack));
+        target.hp -= famDamage;
+        log(`🐾 ${famName} inflige ${famDamage} dégâts à ${target.name}.`);
+        if (target.hp <= 0) {
+            // reward for this kill (same logic as player kill)
+            const baseXp2 = randInt(6, 16);
+            const levelFactor2 = 1 + (target.level || 1) / 10;
+            const RARITY_XP_MULT2 = { common: 1, rare: 1.5, epic: 2, legendary: 3, mythic: 6 };
+            const tier2 = target.tier || 'common';
+            const rarityMult2 = RARITY_XP_MULT2[tier2] || 1;
+            const xpGain2 = Math.max(1, Math.floor(baseXp2 * levelFactor2 * rarityMult2));
+            const goldGain2 = randInt(4, 14);
+            log(`💀 ${target.name} vaincu ! Vous gagnez ${xpGain2} XP et ${goldGain2} or. (${tier2} ×${rarityMult2}, lvl ${target.level})`);
+            player.xp += xpGain2; player.gold += goldGain2;
+            // decide drop by rarity probabilities
+            const totalDrop2 = sumObjectValues(RARITY_DROP_RATES);
+            if (Math.random() < totalDrop2) {
+                const r2 = Math.random() * totalDrop2;
+                let acc2 = 0;
+                let chosenRarity2 = null;
+                for (const [rk2, rv2] of Object.entries(RARITY_DROP_RATES)) {
+                    acc2 += rv2;
+                    if (r2 <= acc2) { chosenRarity2 = rk2; break; }
+                }
+                if (!chosenRarity2) chosenRarity2 = 'common';
+                const dropped2 = pickItemByRarity(chosenRarity2) || pickRandomItem();
+                if (dropped2) {
+                    player.inventory.push({ id: dropped2.id, name: dropped2.name, rarity: dropped2.rarity });
+                    log(`🎁 ${target.name} lâche : ${dropped2.name} (${dropped2.rarity})`);
+                }
+            }
+            // remove dead enemy
+            currentEnemies.splice(targetIndex, 1);
+            if (!currentEnemies || currentEnemies.filter(e => e.hp > 0).length === 0) {
+                endCombatCleanup('victoire');
+                return;
+            }
+            updateStats();
+            return;
+        }
     }
 
     // enemy retaliation: pick a random alive enemy to strike back
@@ -829,6 +887,8 @@ if (closeInvBtn && invModal) {
 // Simplify types to the requested set: arme, botte, ceinture, amulette, anneau, plastron, chapeau, artefact
 function getSimpleType(def) {
     const t = (def.type || '').toString().toLowerCase();
+    // familiers/pets
+    if (t === 'familliers' || t.includes('fam') || t.includes('pet') || def.famAttack) return 'familliers';
     // prefer explicit mapping based on properties
     if (def.rarity === 'mythic' || t === 'artifact' || t === 'artefact') return 'artefact';
     if (t.includes('weapon') || t.includes('ranged') || t.includes('staff') || def.dmg) return 'arme';
@@ -850,6 +910,7 @@ function getItemTooltipHTML(key) {
     if (it.heal) parts.push(`<div class="tt-row"><div class="label">Soigne</div><div class="value">+${it.heal} HP</div></div>`);
     if (it.dmg) parts.push(`<div class="tt-row"><div class="label">DMG</div><div class="value">${it.dmg}</div></div>`);
     if (it.def) parts.push(`<div class="tt-row"><div class="label">DEF</div><div class="value">${it.def}</div></div>`);
+    if (it.famAttack) parts.push(`<div class="tt-row"><div class="label">Attaque (familier)</div><div class="value">+${it.famAttack}</div></div>`);
     if (it.cost) parts.push(`<div class="tt-row"><div class="label">Prix</div><div class="value">${it.cost} g</div></div>`);
     if (it.rarity) parts.push(`<div class="tt-row"><div class="label">Rareté</div><div class="value">${it.rarity}</div></div>`);
     if (it.desc) parts.push(`<div class="tt-row"><div class="label">Info</div><div class="value">${it.desc}</div></div>`);

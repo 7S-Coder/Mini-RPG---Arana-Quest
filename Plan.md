@@ -6,7 +6,7 @@
 [ ] - Boss uniques
 [ ] - Dons de sorts / compétences
 [ ] - Système d’éléments (feu, glace, poison)
-[ ] - Familiers
+[X] - Familiers
 
 [ ITEMS & AMÉLIORATIONS ]
 [ ] - Power[ ] -ups ramassables
