@@ -27,10 +27,13 @@ class Player {
         this.name = "Hero";
         this.hp = 100;
         this.maxHp = 100;
+        this.baseMaxHp = 100;
         this.baseDamage = 10;
         this.baseDefense = 5;
         this.damage = this.baseDamage;
         this.defense = this.baseDefense;
+        this.dodge = 0; // % chance to avoid incoming hit
+        this.crit = 0; // % chance to crit on attack
         this.xp = 0;
         this.lvl = 1;
         this.gold = 50;
@@ -121,6 +124,45 @@ const ITEMS = {
     pet_dog:      { id: 'pet_dog', name: 'Chien fidèle', rarity: 'rare', type: 'familliers', famAttack: 2, def: 1, cost: 120 }
 
 };
+
+// Additional items to ensure each equipment type has at least one item per rarity (except familiers)
+Object.assign(ITEMS, {
+    // armes: ensure mythic present
+    celestial_saber: { id: 'celestial_saber', name: 'Sabre Céleste', rarity: 'mythic', type: 'arme', dmg: 40, dodge: 8, hp: 20, cost: 2200 },
+    // bottes
+    swift_boots_rare: { id: 'swift_boots_rare', name: 'Bottes rapides', rarity: 'rare', type: 'botte', def: 2, hp: 10, dodge: 6, dmg: 2, cost: 45 },
+    boots_of_valor: { id: 'boots_of_valor', name: 'Bottes de Vaillance', rarity: 'legendary', type: 'botte', def: 6, hp: 28, dodge: 12, dmg: 4, bonus: 'stability', cost: 520 },
+    winged_boots: { id: 'winged_boots', name: 'Bottes ailées', rarity: 'mythic', type: 'botte', def: 3, hp: 40, dodge: 20, dmg: 8, bonus: 'flight', cost: 1800 },
+    // ceinture
+    girdle_simple: { id: 'girdle_simple', name: 'Gourdin de cuir', rarity: 'common', type: 'ceinture', def: 2, hp: 8, cost: 8 },
+    girdle_of_might: { id: 'girdle_of_might', name: 'Ceinture de Puissance', rarity: 'rare', type: 'ceinture', def: 6, hp: 20, cost: 60 },
+    girdle_legend: { id: 'girdle_legend', name: 'Ceinture des Légendes', rarity: 'epic', type: 'ceinture', def: 10, hp: 36, cost: 200 },
+    belt_of_titans: { id: 'belt_of_titans', name: 'Ceinture des Titans', rarity: 'legendary', type: 'ceinture', def: 14, hp: 56, cost: 650 },
+    void_belt: { id: 'void_belt', name: 'Ceinture du Vide', rarity: 'mythic', type: 'ceinture', def: 22, hp: 90, bonus: 'void', cost: 1600 },
+    // amulette
+    amulet_simple: { id: 'amulet_simple', name: 'Amulette simple', rarity: 'common', type: 'amulette', dmg: 1, hp: 6, cost: 12 },
+    amulet_rare: { id: 'amulet_rare', name: 'Amulette de Soin', rarity: 'rare', type: 'amulette', bonus: 'regen', hp: 30, cost: 55 },
+    amulet_epic: { id: 'amulet_epic', name: 'Amulette d’Énergie', rarity: 'epic', type: 'amulette', bonus: 'mana', hp: 50, cost: 210 },
+    amulet_legend: { id: 'amulet_legend', name: 'Amulette des Âges', rarity: 'legendary', type: 'amulette', bonus: 'time', hp: 120, cost: 900 },
+    heart_of_void: { id: 'heart_of_void', name: 'Cœur du Vide', rarity: 'mythic', type: 'amulette', bonus: 'void', hp: 300, cost: 2400 },
+    // anneau
+    simple_ring: { id: 'simple_ring', name: 'Anneau simple', rarity: 'common', type: 'anneau', hp: 8, crit: 2, dodge: 2, cost: 10 },
+    band_of_storms: { id: 'band_of_storms', name: 'Bague des Tempêtes', rarity: 'epic', type: 'anneau', bonus: 'crit', hp: 28, crit: 8, dodge: 6, cost: 220 },
+    ring_mythic: { id: 'ring_mythic', name: 'Anneau du Cosmos', rarity: 'mythic', type: 'anneau', bonus: 'cosmic', hp: 120, crit: 14, dodge: 10, cost: 2100 },
+    // plastron
+    leather_armor: { id: 'leather_armor', name: 'Armure en cuir', rarity: 'common', type: 'plastron', def: 2, hp: 14, cost: 25 },
+    scale_mail: { id: 'scale_mail', name: 'Cotte d’écailles', rarity: 'rare', type: 'plastron', def: 6, hp: 36, cost: 95 },
+    legend_plate: { id: 'legend_plate', name: 'Plastron légendaire', rarity: 'epic', type: 'plastron', def: 11, hp: 88, cost: 380 },
+    mythic_armor: { id: 'mythic_armor', name: 'Armure Mythique', rarity: 'mythic', type: 'plastron', def: 20, hp: 260, cost: 3000 },
+    // chapeau
+    simple_hat: { id: 'simple_hat', name: 'Chapeau simple', rarity: 'common', type: 'chapeau', def: 1, hp: 8, dmg: 1, cost: 6 },
+    helm_guard: { id: 'helm_guard', name: 'Casque du Gardien', rarity: 'rare', type: 'chapeau', def: 4, hp: 22, dmg: 3, cost: 70 },
+    crown_command: { id: 'crown_command', name: 'Couronne de Commandement', rarity: 'legendary', type: 'chapeau', def: 8, hp: 74, dmg: 8, bonus: 'lead', cost: 800 },
+    // artefact
+    talisman_rare: { id: 'talisman_rare', name: 'Talisman ancien', rarity: 'rare', type: 'artefact', bonus: 'ward', cost: 75 },
+    chronicle_epic: { id: 'chronicle_epic', name: 'Chronique du temps', rarity: 'epic', type: 'artefact', bonus: 'xp', cost: 300 },
+    time_core_legend: { id: 'time_core_legend', name: 'Noyau du Temps', rarity: 'legendary', type: 'artefact', bonus: 'time', cost: 1400 }
+});
 
 // Enemy tiers for difficulty scaling (levels and spawn weights)
 const ENEMY_TIERS = {
@@ -340,6 +382,46 @@ function createEnemyFromTier(tier, index) {
     e.level = level;
     e.tier = tier;
     e.defense = def;
+    // compute enemy dodge/crit based on level and tier
+    const stats = computeEnemyCombatStats(level, tier);
+    e.dodge = stats.dodge;
+    e.crit = stats.crit;
+    return e;
+}
+
+// Compute simple enemy combat stats (dodge %, crit %) from level and tier
+function computeEnemyCombatStats(level, tier) {
+    const tierBonus = { common: 0, rare: 1, epic: 2, legendary: 4, mythic: 8 };
+    const bonus = tierBonus[tier] || 0;
+    // Dodge grows slowly with level + tier bonus
+    const dodge = Math.min(35, Math.floor(level * 0.25) + bonus);
+    // Crit is smaller, grows with level and tier
+    const crit = Math.min(25, Math.floor(level * 0.12) + Math.floor(bonus * 0.8));
+    return { dodge, crit };
+}
+
+// Create a map-specific enemy using the map's uniqueEnemies definitions
+function createMapEnemy(mapId, index) {
+    const mapCfg = MAPS[mapId] || null;
+    if (!mapCfg || !Array.isArray(mapCfg.uniqueEnemies) || mapCfg.uniqueEnemies.length === 0) {
+        // fallback to generic tier enemy
+        return createEnemyFromTier(weightedPickEnemyTier(), index);
+    }
+    const def = mapCfg.uniqueEnemies[Math.floor(Math.random() * mapCfg.uniqueEnemies.length)];
+    const name = `${def.name} #${(index||0)+1}`;
+    const hp = def.baseHp || Math.max(12, 18 + Math.floor(Math.random()*12));
+    const dmg = def.damage || Math.max(1, Math.floor(hp/8));
+    const e = new Enemy(name, Math.floor(hp), Math.floor(dmg));
+    e.maxHp = Math.floor(hp);
+    e.hp = Math.floor(hp);
+    e.level = (ENEMY_TIERS[def.tier] && ENEMY_TIERS[def.tier].levelMin) ? Math.floor(Math.random() * (ENEMY_TIERS[def.tier].levelMax - ENEMY_TIERS[def.tier].levelMin + 1)) + ENEMY_TIERS[def.tier].levelMin : 1;
+    e.tier = def.tier || 'common';
+    e.defense = def.defense || def.def || 0;
+    e.originMap = mapId;
+    // enemy combat stats
+    const stats = computeEnemyCombatStats(e.level, e.tier);
+    e.dodge = stats.dodge;
+    e.crit = stats.crit;
     return e;
 }
 
@@ -466,6 +548,10 @@ function recalcStatsFromEquipment() {
     // start from player's base values
     player.damage = typeof player.baseDamage === 'number' ? player.baseDamage : 10;
     player.defense = typeof player.baseDefense === 'number' ? player.baseDefense : 5;
+    // reset max HP to base and other derived stats
+    player.maxHp = typeof player.baseMaxHp === 'number' ? player.baseMaxHp : 100;
+    player.dodge = 0;
+    player.crit = 0;
     // reset familiar attack info
     player.familiarAttack = 0;
     player.familiarName = null;
@@ -475,12 +561,17 @@ function recalcStatsFromEquipment() {
         if (!def) return;
         if (def.dmg) player.damage += def.dmg;
         if (def.def) player.defense += def.def;
+        if (def.hp) player.maxHp += def.hp;
+        if (def.dodge) player.dodge += def.dodge;
+        if (def.crit) player.crit += def.crit;
         // accumulate familiar attack if this item is a familier
         if (def.famAttack) {
             player.familiarAttack += def.famAttack;
             if (!player.familiarName && def.name) player.familiarName = def.name;
         }
     });
+    // ensure current HP does not exceed max
+    player.hp = Math.min(player.hp || player.maxHp, player.maxHp);
 }
 
 // Check and apply level ups if player has enough XP. Multiple levels possible.
@@ -500,6 +591,8 @@ function checkLevelUp() {
         player.maxHp = (typeof player.maxHp === 'number' ? player.maxHp : 100) + hpGain;
         // heal the player by the gained HP so they feel rewarded
         player.hp = Math.min(player.maxHp, (typeof player.hp === 'number' ? player.hp : player.maxHp) + hpGain);
+        // keep baseMaxHp in sync with level-driven maxHp increases
+        player.baseMaxHp = player.maxHp;
         player.baseDamage = (typeof player.baseDamage === 'number' ? player.baseDamage : 10) + dmgGain;
         player.baseDefense = (typeof player.baseDefense === 'number' ? player.baseDefense : 5) + defGain;
         leveled = true;
@@ -544,10 +637,13 @@ function savePlayer() {
             name: player.name,
             hp: player.hp,
             maxHp: player.maxHp,
+            baseMaxHp: player.baseMaxHp,
             baseDamage: player.baseDamage,
             baseDefense: player.baseDefense,
             damage: player.damage,
             defense: player.defense,
+            dodge: player.dodge,
+            crit: player.crit,
             xp: player.xp,
             lvl: player.lvl,
             gold: player.gold,
@@ -582,6 +678,9 @@ function loadPlayer() {
         player.baseDefense = typeof data.baseDefense === 'number' ? data.baseDefense : player.baseDefense;
         player.damage = typeof data.damage === 'number' ? data.damage : player.damage;
         player.defense = typeof data.defense === 'number' ? data.defense : player.defense;
+        player.baseMaxHp = typeof data.baseMaxHp === 'number' ? data.baseMaxHp : player.baseMaxHp;
+        player.dodge = typeof data.dodge === 'number' ? data.dodge : player.dodge;
+        player.crit = typeof data.crit === 'number' ? data.crit : player.crit;
         player.inventory = Array.isArray(data.inventory) ? data.inventory : player.inventory;
         // restore equipment if present
         if (data.equipment && typeof data.equipment === 'object') {
@@ -624,7 +723,7 @@ function updateStats() {
     // apply any pending level ups first
     checkLevelUp();
     const neededXP = xpToNextLevel(player.lvl);
-    let s = `HP: ${player.hp}/${player.maxHp}\nNiveau: ${player.lvl}  XP: ${player.xp}/${neededXP}xp\nDégâts: ${player.damage}  Défense: ${player.defense}\nOr: ${player.gold}`;
+    let s = `HP: ${player.hp}/${player.maxHp}\nNiveau: ${player.lvl}  XP: ${player.xp}/${neededXP}xp\nDégâts: ${player.damage}  Défense: ${player.defense}  ESQ: ${player.dodge || 0}%  CRIT: ${player.crit || 0}%\nOr: ${player.gold}`;
     // show current location: dungeon with room progress or current map
     try {
         if (currentDungeon && typeof currentDungeon === 'object') {
@@ -668,8 +767,10 @@ function renderEnemyInfo() {
             const name = `<span class="ec-name" style="color:${color};${glow}">${e.name}</span>`;
             const meta = `<span class="ec-meta">${e.tier} — lvl ${e.level}</span>`;
             const hpText = `${Math.max(0, e.hp)}${e.maxHp ? ` / ${e.maxHp}` : ''}`;
-            return `<div class="enemy-card" data-index="${i}" data-dead="${dead}"><div class="ec-head"><div>${name} ${meta}</div><div class="ec-hp">HP: ${hpText}</div></div><div class="ec-stats"><div class="stat ec-dmg">DMG: ${e.damage}</div><div class="stat ec-def">DEF: ${e.defense || 0}</div></div></div>`;
-        }).join('');
+            const esq = e.dodge ? `${e.dodge}%` : '—';
+            const crit = e.crit ? `${e.crit}%` : '—';
+            return `<div class="enemy-card" data-index="${i}" data-dead="${dead}"><div class="ec-head"><div>${name} ${meta}</div><div class="ec-hp">HP: ${hpText}</div></div><div class="ec-stats"><div class="stat ec-dmg">DMG: ${e.damage}</div><div class="stat ec-def">DEF: ${e.defense || 0}</div><div class="stat ec-esq">ESQ: ${esq}</div><div class="stat ec-crit">CRIT: ${crit}</div></div></div>`;
+            }).join('');
         el.innerHTML = `<div class="enemy-cards">${html}</div>`;
 }
 
@@ -757,11 +858,75 @@ document.getElementById('attackBtn').addEventListener('click', () => {
     const targetIndex = currentEnemies.findIndex(e => e.hp > 0);
     if (targetIndex === -1) { log('ℹ️ Aucun ennemi vivant.'); return; }
     const target = currentEnemies[targetIndex];
-    const actualDamage = Math.max(1, player.damage - (target.defense || 0));
-    target.hp -= actualDamage;
-    // visual feedback
-    showDamageOnEnemy(targetIndex, actualDamage);
-    log(`⚔️ Vous infligez ${actualDamage} dégâts à ${target.name} (def ${target.defense || 0})`);
+    // check for enemy dodge
+    const targetDodge = target.dodge || 0;
+    if (targetDodge > 0 && Math.random() < (targetDodge/100)) {
+        // miss
+        showDamageOnEnemy(targetIndex, 'Miss');
+        log(`⚠️ ${target.name} esquive votre attaque !`);
+        // enemy may still retaliate below
+    } else {
+        // base damage after defense
+        let actualDamage = Math.max(1, player.damage - (target.defense || 0));
+        // crit check
+        const critChance = player.crit || 0;
+        const isCrit = (critChance > 0 && Math.random() < (critChance/100));
+        if (isCrit) {
+            actualDamage = Math.max(1, Math.round(actualDamage * 1.5));
+        }
+        target.hp -= actualDamage;
+        // visual feedback (mark crit visually)
+        const dmgLabel = isCrit ? `${actualDamage} ⚡` : actualDamage;
+        showDamageOnEnemy(targetIndex, dmgLabel);
+        log(`⚔️ Vous infligez ${actualDamage} dégâts à ${target.name} (def ${target.defense || 0})${isCrit ? ' — COUP CRITIQUE !' : ''}`);
+
+        if (target.hp <= 0) {
+            // show kill effect
+            showEnemyKill(targetIndex);
+            // reward for this kill
+            // XP: base roll scaled by enemy level and rarity multiplier
+            const baseXp = randInt(6, 16);
+            const levelFactor = 1 + (target.level || 1) / 10; // multiplicative factor from enemy level
+            const RARITY_XP_MULT = { common: 1, rare: 1.5, epic: 2, legendary: 3, mythic: 6 };
+            const tier = target.tier || 'common';
+            const rarityMult = RARITY_XP_MULT[tier] || 1;
+            const xpGain = Math.max(1, Math.floor(baseXp * levelFactor * rarityMult));
+            const goldGain = randInt(4, 14);
+            log(`💀 ${target.name} vaincu ! Vous gagnez ${xpGain} XP et ${goldGain} or. (${tier} ×${rarityMult}, lvl ${target.level})`);
+            player.xp += xpGain; player.gold += goldGain;
+            // decide drop by rarity probabilities
+            const totalDrop = sumObjectValues(RARITY_DROP_RATES);
+            if (Math.random() < totalDrop) {
+                const r = Math.random() * totalDrop;
+                let acc = 0;
+                let chosenRarity = null;
+                for (const [rk, rv] of Object.entries(RARITY_DROP_RATES)) {
+                    acc += rv;
+                    if (r <= acc) { chosenRarity = rk; break; }
+                }
+                if (!chosenRarity) chosenRarity = 'common';
+                // try map-specific loot first (enemy may carry originMap)
+                const mapId = target.originMap || currentMap;
+                const dropped = (pickMapItemByRarity(mapId, chosenRarity) || pickItemByRarity(chosenRarity) || pickRandomItem());
+                if (dropped) {
+                    player.inventory.push({ id: dropped.id, name: dropped.name, rarity: dropped.rarity });
+                    const rDef = RARITIES[dropped.rarity] || { color: 'white' };
+                    const glow = getGlowStyle(rDef, { type: 'text', size: 6 });
+                    const style = `color:${rDef.color};${glow}`;
+                    const itemHtml = `<span style="${style}">${dropped.name}</span> <em>(${dropped.rarity})</em>`;
+                    logHTML(`🎁 ${target.name} lâche : ${itemHtml}`);
+                }
+            }
+            // remove dead enemy
+            currentEnemies.splice(targetIndex, 1);
+            if (!currentEnemies || currentEnemies.filter(e => e.hp > 0).length === 0) {
+                endCombatCleanup('victoire');
+                return;
+            }
+            updateStats();
+            return;
+        }
+    }
     if (target.hp <= 0) {
         // show kill effect
         showEnemyKill(targetIndex);
@@ -861,10 +1026,21 @@ document.getElementById('attackBtn').addEventListener('click', () => {
     const alive = currentEnemies.filter(e => e.hp > 0);
     if (alive.length > 0) {
         const attacker = alive[Math.floor(Math.random() * alive.length)];
-        const edmg = Math.max(0, attacker.damage - player.defense);
-        player.hp -= edmg;
-        showDamageOnPlayer(edmg);
-        log(`🛡️ ${attacker.name} riposte et inflige ${edmg} dégâts.`);
+        // enemy attack: consider player's dodge
+        const attackerDmgBase = Math.max(0, attacker.damage - player.defense);
+        const playerDodge = player.dodge || 0;
+        if (playerDodge > 0 && Math.random() < (playerDodge/100)) {
+            showDamageOnPlayer('Miss');
+            log(`✨ Vous esquivez l'attaque de ${attacker.name} !`);
+        } else {
+            // enemy crit chance
+            const attackerCrit = attacker.crit || 0;
+            const isCrit = attackerCrit > 0 && Math.random() < (attackerCrit/100);
+            const attackerDmg = isCrit ? Math.max(1, Math.round(attackerDmgBase * 1.5)) : attackerDmgBase;
+            player.hp -= attackerDmg;
+            showDamageOnPlayer(isCrit ? `${attackerDmg} ⚡` : attackerDmg);
+            log(`🛡️ ${attacker.name} riposte et inflige ${attackerDmg} dégâts.${isCrit ? ' — COUP CRITIQUE !' : ''}`);
+        }
         if (player.hp <= 0) {
             showPlayerDeath();
             // Respawn: restore HP to max and end combat
@@ -888,9 +1064,17 @@ document.getElementById('runBtn').addEventListener('click', () => {
         const alive = currentEnemies.filter(e => e.hp > 0);
         if (alive.length > 0) {
             const attacker = alive[Math.floor(Math.random() * alive.length)];
-            const edmg = Math.max(0, attacker.damage - player.defense);
-                player.hp -= edmg;
-                showDamageOnPlayer(edmg);
+            const attackerDmgBase = Math.max(0, attacker.damage - player.defense);
+            const playerDodge = player.dodge || 0;
+            if (playerDodge > 0 && Math.random() < (playerDodge/100)) {
+                showDamageOnPlayer('Miss');
+                log(`✨ Vous esquivez l'attaque de ${attacker.name} !`);
+            } else {
+                const attackerCrit = attacker.crit || 0;
+                const isCrit = attackerCrit > 0 && Math.random() < (attackerCrit/100);
+                const attackerDmg = isCrit ? Math.max(1, Math.round(attackerDmgBase * 1.5)) : attackerDmgBase;
+                player.hp -= attackerDmg;
+                showDamageOnPlayer(isCrit ? `${attackerDmg} ⚡` : attackerDmg);
                 if (player.hp <= 0) {
                     showPlayerDeath();
                     player.hp = player.maxHp;
@@ -898,6 +1082,7 @@ document.getElementById('runBtn').addEventListener('click', () => {
                     endCombatCleanup('mort');
                     return;
                 }
+            }
         }
     }
     updateStats();
@@ -978,7 +1163,8 @@ function renderShop() {
         const glow = getGlowStyle(r);
         const style = `color:${r.color};${glow}`;
         const tooltip = getItemTooltipHTML(id);
-        html += `<div class="shop-item"><span style="${style}">${def.name}</span> ${tooltip} — ${def.rarity} — ${def.cost || 'N/A'}g <button data-action="buy" data-id="${id}">Acheter</button></div>`;
+        const stats = getItemStatsSummary(def);
+        html += `<div class="shop-item"><span style="${style}">${def.name} ${stats}</span> ${tooltip} — ${def.rarity} — ${def.cost || 'N/A'}g <button data-action="buy" data-id="${id}">Acheter</button></div>`;
     });
     // include a close control for modal behavior
     shopEl.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><strong>Magasin</strong><button id="closeShop" class="btn">Fermer</button></div>${html}`;
@@ -1104,12 +1290,13 @@ function renderDroppableCatalog() {
         const style = `color:${r.color};${glow}`;
         const simpleType = getSimpleType(it);
         const typeLabel = simpleType ? ` <span class="item-type">(${simpleType})</span>` : '';
+        const stats = getItemStatsSummary(it);
         const extra = it.heal ? `(+${it.heal} HP)` : (it.dmg ? `(DMG ${it.dmg})` : (it.def ? `(DEF ${it.def})` : ''));
         const rate = getItemDropRate(key);
         const pct = (rate * 100).toFixed(3).replace(/\.000$/, '');
         const rateLabel = ` <span class="drop-rate">Taux de drop: ${pct}%</span>`;
         const tooltip = getItemTooltipHTML(key);
-        return `<div class="catalog-item"><strong style="${style}">${it.name}</strong> ${typeLabel} — <em>${it.rarity}</em> ${extra}${rateLabel}${tooltip}</div>`;
+        return `<div class="catalog-item"><strong style="${style}">${it.name} ${stats}</strong> ${typeLabel} — <em>${it.rarity}</em> ${extra}${rateLabel}${tooltip}</div>`;
     }).join('');
     el.innerHTML = `<div class="catalog-head"><h3>Catalogue des drops</h3><button id="closeCatalog" class="btn">Fermer</button></div>${html}`;
     // wire close button
@@ -1352,6 +1539,51 @@ function getSimpleType(def) {
     return 'artefact';
 }
 
+// Auto-apply stats (hp, dodge, crit, etc.) to ITEMS based on simple type and rarity.
+function applyAutoStatsToItems() {
+    const rarityMult = { common: 1, rare: 1.4, epic: 1.8, legendary: 2.6, mythic: 4 };
+    const baseByType = {
+        botte: { dodge: 3, hp: 6, dmg: 1 },
+        ceinture: { hp: 12, def: 1 },
+        arme: { dmg: 6, dodge: 2 },
+        anneau: { hp: 6, crit: 2, dodge: 1 },
+        plastron: { hp: 18, def: 3 },
+        chapeau: { hp: 6, dmg: 1, def: 1 },
+        artefact: {}
+    };
+
+    Object.keys(ITEMS).forEach(k => {
+        const it = ITEMS[k];
+        if (!it || typeof it !== 'object') return;
+        const t = getSimpleType(it);
+        if (t === 'familliers') return; // skip familiars
+        const base = baseByType[t] || {};
+        const mult = rarityMult[(it.rarity || 'common')] || 1;
+
+        // helper to add numeric stat
+        const add = (prop, amount) => {
+            if (amount === undefined || amount === 0) return;
+            const v = Math.max(0, Math.round(amount * mult));
+            if (v === 0) return;
+            if (it[prop] === undefined) it[prop] = v; else if (typeof it[prop] === 'number') it[prop] = Math.round(it[prop] + v);
+        };
+
+        // apply base stats
+        Object.keys(base).forEach(p => add(p, base[p]));
+
+        // Rarity bonus: add small extra stats for higher rarities
+        if (it.rarity === 'epic' || it.rarity === 'legendary' || it.rarity === 'mythic') {
+            add('hp', Math.round((base.hp || 4) * (it.rarity === 'epic' ? 1.2 : it.rarity === 'legendary' ? 1.8 : 3)));
+            if ((base.dodge || 0) > 0) add('dodge', Math.round((base.dodge || 1) * (it.rarity === 'epic' ? 1.2 : it.rarity === 'legendary' ? 1.6 : 2)));
+            if ((base.def || 0) > 0) add('def', Math.round((base.def || 1) * (it.rarity === 'epic' ? 1.2 : it.rarity === 'legendary' ? 1.6 : 2)));
+            if ((base.dmg || 0) > 0) add('dmg', Math.round((base.dmg || 1) * (it.rarity === 'epic' ? 1.1 : it.rarity === 'legendary' ? 1.5 : 2)));
+            // chance for a crit stat on high rarities
+            if (!it.crit && (it.rarity === 'legendary' || it.rarity === 'mythic')) add('crit', it.rarity === 'legendary' ? 3 : 6);
+        }
+    });
+}
+
+
 // Returns tooltip HTML for an item key (used inside .inv-item, .shop-item, .catalog-item)
 function getItemTooltipHTML(key) {
     const it = ITEMS[key] || {};
@@ -1360,7 +1592,39 @@ function getItemTooltipHTML(key) {
     if (it.heal) parts.push(`<div class="tt-row"><div class="label">Soigne</div><div class="value">+${it.heal} HP</div></div>`);
     if (it.dmg) parts.push(`<div class="tt-row"><div class="label">DMG</div><div class="value">${it.dmg}</div></div>`);
     if (it.def) parts.push(`<div class="tt-row"><div class="label">DEF</div><div class="value">${it.def}</div></div>`);
+    if (it.dodge) parts.push(`<div class="tt-row"><div class="label">Esquive</div><div class="value">+${it.dodge}%</div></div>`);
+    if (it.crit) parts.push(`<div class="tt-row"><div class="label">Crit</div><div class="value">+${it.crit}%</div></div>`);
     if (it.famAttack) parts.push(`<div class="tt-row"><div class="label">Attaque (familier)</div><div class="value">+${it.famAttack}</div></div>`);
+    // HP / PV stat (single value or array of values)
+    if (it.hp !== undefined) {
+        if (Array.isArray(it.hp)) {
+            it.hp.forEach(h => parts.push(`<div class="tt-row"><div class="label">PV</div><div class="value">${h >= 0 ? '+'+h : h} PV</div></div>`));
+        } else if (typeof it.hp === 'object' && it.hp !== null) {
+            // object form: {label: 'Max PV', value: 10}
+            const label = it.hp.label || 'PV';
+            const value = it.hp.value !== undefined ? it.hp.value : '';
+            parts.push(`<div class="tt-row"><div class="label">${label}</div><div class="value">${value >= 0 ? '+'+value : value} PV</div></div>`);
+        } else {
+            parts.push(`<div class="tt-row"><div class="label">PV</div><div class="value">${it.hp >= 0 ? '+'+it.hp : it.hp} PV</div></div>`);
+        }
+    }
+    // legacy alias 'pv'
+    if (it.pv !== undefined) {
+        if (Array.isArray(it.pv)) {
+            it.pv.forEach(h => parts.push(`<div class="tt-row"><div class="label">PV</div><div class="value">${h >= 0 ? '+'+h : h} PV</div></div>`));
+        } else {
+            parts.push(`<div class="tt-row"><div class="label">PV</div><div class="value">${it.pv >= 0 ? '+'+it.pv : it.pv} PV</div></div>`);
+        }
+    }
+    // generic stats array: [{label:'...', value:'...'}]
+    if (it.stats && Array.isArray(it.stats)) {
+        it.stats.forEach(s => {
+            if (!s) return;
+            const label = s.label || 'Stat';
+            const value = s.value !== undefined ? s.value : '';
+            parts.push(`<div class="tt-row"><div class="label">${label}</div><div class="value">${value}</div></div>`);
+        });
+    }
     if (it.cost) parts.push(`<div class="tt-row"><div class="label">Prix</div><div class="value">${it.cost} g</div></div>`);
     if (it.rarity) parts.push(`<div class="tt-row"><div class="label">Rareté</div><div class="value">${it.rarity}</div></div>`);
     if (it.desc) parts.push(`<div class="tt-row"><div class="label">Info</div><div class="value">${it.desc}</div></div>`);
@@ -1368,10 +1632,35 @@ function getItemTooltipHTML(key) {
     return `<div class="item-tooltip">${parts.join('')}</div>`;
 }
 
+// Return a short inline stats summary for display in lists (catalog/shop/inventory)
+function getItemStatsSummary(it) {
+    if (!it) return '';
+    const parts = [];
+    const fmt = (v) => (typeof v === 'number' ? v : v);
+    // hp can be array/object/number
+    if (it.hp !== undefined) {
+        if (Array.isArray(it.hp)) parts.push(`PV ${it.hp.map(fmt).join('/')}`);
+        else if (typeof it.hp === 'object' && it.hp !== null) parts.push(`${it.hp.label || 'PV'} ${fmt(it.hp.value)}`);
+        else parts.push(`PV ${fmt(it.hp)}`);
+    } else if (it.pv !== undefined) {
+        if (Array.isArray(it.pv)) parts.push(`PV ${it.pv.map(fmt).join('/')}`); else parts.push(`PV ${fmt(it.pv)}`);
+    }
+    if (it.dmg !== undefined) parts.push(`DMG ${fmt(it.dmg)}`);
+    if (it.def !== undefined) parts.push(`DEF ${fmt(it.def)}`);
+    if (it.dodge !== undefined) parts.push(`ESQ ${fmt(it.dodge)}%`);
+    if (it.crit !== undefined) parts.push(`CRIT ${fmt(it.crit)}%`);
+    if (parts.length === 0) return '';
+    return `<span class="item-stats-inline">(${parts.join(' | ')})</span>`;
+}
+
 // load saved player if present (before first save in updateStats)
 let _hadSaved = false;
 try { _hadSaved = !!localStorage.getItem(STORAGE_KEY); } catch(e) { _hadSaved = false; }
+// enrich items with auto stats before UI renders tooltips
+try { applyAutoStatsToItems(); } catch(e) { console.warn('applyAutoStatsToItems failed', e); }
 loadPlayer();
+// recalc derived stats from equipment after loading saved player
+try { recalcStatsFromEquipment(); } catch(e) { console.warn('recalcStatsFromEquipment failed', e); }
 if (_hadSaved) 
 updateStats();
 
@@ -1500,7 +1789,7 @@ function showDamageOnEnemy(index, amount) {
         card.classList.add('shake');
         const dmgEl = document.createElement('div');
         dmgEl.className = 'damage-float enemy-damage';
-        dmgEl.textContent = `-${amount}`;
+        dmgEl.textContent = (typeof amount === 'number') ? `-${amount}` : amount;
         card.appendChild(dmgEl);
         dmgEl.addEventListener('animationend', () => dmgEl.remove());
         setTimeout(() => card.classList.remove('shake'), 500);
@@ -1522,7 +1811,7 @@ function showDamageOnPlayer(amount) {
         dmgEl.className = 'damage-float player-damage';
         dmgEl.style.right = '12px';
         dmgEl.style.top = '12px';
-        dmgEl.textContent = `-${amount}`;
+        dmgEl.textContent = (typeof amount === 'number') ? `-${amount}` : amount;
         panel.appendChild(dmgEl);
         dmgEl.addEventListener('animationend', () => dmgEl.remove());
     } catch (e) { console.warn('showDamageOnPlayer', e); }
