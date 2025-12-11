@@ -1,6 +1,7 @@
 # Ignorer fichiers personnels
 player_notes_full.txt
 
+
 # Node / build artefacts (if any)
 node_modules/
 dist/

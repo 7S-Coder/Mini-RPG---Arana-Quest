@@ -20,9 +20,9 @@
 
     <main class="container">
         <section id="logPanel" class="panel log-panel">
+                <button id="goToArena" class="btn primary">Aller à l'arène</button>
             <div id="log" class="log" aria-live="polite"></div>
             <div class="log-controls" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-                <button id="goToArena" class="btn primary">Aller à l'arène</button>
                 <button id="attackBtn" class="btn danger">Attaquer</button>
                 <button id="runBtn" class="btn">Fuir</button>
             </div>
@@ -39,13 +39,8 @@
                 </div>
             </div>
             <p id="playerStats" class="stats"></p>
-            <div id="equipmentPanel" class="equipment-panel">
-                <h3>Équipement</h3>
-                <div id="equipment" class="equipment"></div>
-            </div>
-            <div id="inventoryPanel" class="inventory-panel">
-                <h3>Inventaire</h3>
-                <div id="inventory" class="inventory-list"></div>
+            <div class="player-controls" style="margin-top:12px;">
+                <button id="openInventoryBtn" class="btn">Inventaire &amp; Équipement</button>
             </div>
         </section>
 
@@ -72,6 +67,45 @@
 
     <!-- Backdrop for modals (shop / catalog) -->
     <div id="modalBackdrop" class="modal-backdrop" style="display:none;"></div>
+
+    <!-- Modal for Inventory & Equipment -->
+    <div id="invEquipModal" class="modal" role="dialog" aria-hidden="true" style="display:none;">
+        <div class="modal-content">
+            <button id="closeInvEquipModal" class="modal-close" aria-label="Fermer">✕</button>
+            <h2>Inventaire &amp; Équipement</h2>
+            <div class="modal-columns">
+                <div class="modal-column">
+                    <h3>Équipement</h3>
+                    <div id="equipment" class="equipment">
+                        <div class="equipment-figure" aria-hidden="true">
+                            <!-- Simple humanoid SVG (head + torso) -->
+                            <svg viewBox="0 0 200 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Silhouette joueur">
+                                <defs>
+                                  <linearGradient id="skin" x1="0" x2="0" y1="0" y2="1">
+                                    <stop offset="0%" stop-color="#d8c8b0" stop-opacity="0.9" />
+                                    <stop offset="100%" stop-color="#bfa98a" stop-opacity="0.9" />
+                                  </linearGradient>
+                                </defs>
+                                <!-- head -->
+                                <circle cx="100" cy="60" r="28" fill="url(#skin)" stroke="rgba(0,0,0,0.35)" stroke-width="1" />
+                                <!-- neck -->
+                                <rect x="92" y="84" width="16" height="8" rx="2" fill="#c8b39b" />
+                                <!-- torso -->
+                                <path d="M60 110 C60 170, 140 170, 140 110 L140 210 C120 230, 80 230, 60 210 Z" fill="#2b2f34" opacity="0.95" stroke="rgba(255,255,255,0.03)" />
+                                <!-- simple shoulders hint -->
+                                <ellipse cx="100" cy="120" rx="38" ry="8" fill="rgba(255,255,255,0.02)" />
+                            </svg>
+                        </div>
+                        <div class="equipment-slots" aria-live="polite"></div>
+                    </div>
+                </div>
+                <div class="modal-column">
+                    <h3>Inventaire</h3>
+                    <div id="inventory" class="inventory-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script type="module" src="app.js"></script>
 </body>

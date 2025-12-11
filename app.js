@@ -44,7 +44,8 @@ class Player {
             anneau: null,
             plastron: null,
             chapeau: null,
-            artefact: null
+            artefact: null,
+            familliers: null
         };
     }
 }
@@ -300,9 +301,10 @@ function recalcStatsFromEquipment() {
 
 // Check and apply level ups if player has enough XP. Multiple levels possible.
 function checkLevelUp() {
+    const MAX_LEVEL = 80;
     let leveled = false;
-    // while enough XP for next level
-    while (player.xp >= xpToNextLevel(player.lvl)) {
+    // while enough XP for next level and not already at max level
+    while (player.lvl < MAX_LEVEL && player.xp >= xpToNextLevel(player.lvl)) {
         const needed = xpToNextLevel(player.lvl);
         // consume XP for this level
         player.xp -= needed;
@@ -323,6 +325,17 @@ function checkLevelUp() {
         // reapply equipment modifiers on top of new base stats
         recalcStatsFromEquipment();
         // persist and refresh UI (but avoid infinite recursion: updateStats will still render)
+        savePlayer();
+    }
+    // if player reached max level, ensure XP cannot trigger further levels and notify
+    if (player.lvl >= MAX_LEVEL) {
+        player.lvl = Math.min(player.lvl, MAX_LEVEL);
+        // cap XP so it doesn't allow another level-up
+        try {
+            const cap = Math.max(0, xpToNextLevel(player.lvl) - 1);
+            player.xp = Math.min(player.xp, cap);
+        } catch (e) { /* ignore */ }
+        logHTML(`🔒 Niveau maximum atteint (${MAX_LEVEL}). Plus de montée de niveau disponible.`);
         savePlayer();
     }
 }
@@ -696,21 +709,23 @@ if (shopEl) {
 function updateInventory() {
     const invEl = document.getElementById('inventory');
     const equipEl = document.getElementById('equipment');
-    if (!invEl || !equipEl) return;
+    const equipSlotsEl = equipEl ? equipEl.querySelector('.equipment-slots') : null;
+    if (!invEl || !equipEl || !equipSlotsEl) return;
 
-    // render equipment slots
+    // render equipment slots into the positioned slots container
     const slotLabels = {
-        arme: 'Arme', botte: 'Botte', ceinture: 'Ceinture', amulette: 'Amulette', anneau: 'Anneau', plastron: 'Plastron', chapeau: 'Chapeau', artefact: 'Artefact'
+        arme: 'Arme', botte: 'Botte', ceinture: 'Ceinture', amulette: 'Amulette', anneau: 'Anneau', plastron: 'Plastron', chapeau: 'Chapeau', artefact: 'Artefact', familliers: 'Familliers'
     };
-    equipEl.innerHTML = Object.keys(player.equipment).map(slot => {
+    equipSlotsEl.innerHTML = Object.keys(player.equipment).map(slot => {
+        const cls = `equip-slot slot-${slot}`;
         const id = player.equipment[slot];
-        if (!id) return `<div class="equip-slot"><div class="slot-name">${slotLabels[slot]}</div><div class="slot-item muted">vide</div></div>`;
+        if (!id) return `<div class="${cls}"><div class="slot-name">${slotLabels[slot]}</div><div class="slot-item muted">vide</div></div>`;
         const def = ITEMS[id] || { name: id, rarity: 'common' };
         const r = RARITIES[def.rarity] || { color: 'white' };
         const glow = getGlowStyle(r);
         const style = `color:${r.color};${glow}`;
         const tooltip = getItemTooltipHTML(id);
-        return `<div class="equip-slot"><div class="slot-name">${slotLabels[slot]}</div><div class="slot-item" style="${style}">${def.name}${tooltip}</div><button onclick="unequipSlot('${slot}')">Déséquiper</button></div>`;
+        return `<div class="${cls}"><div class="slot-name">${slotLabels[slot]}</div><div class="slot-item" style="${style}">${def.name}${tooltip}</div><button onclick="unequipSlot('${slot}')">Déséquiper</button></div>`;
     }).join('');
 
     // render inventory items
@@ -785,7 +800,29 @@ if (modalBackdropEl) {
         const catalog = document.getElementById('catalog');
         if (shop) { shop.style.display = 'none'; shop.setAttribute('aria-hidden', 'true'); }
         if (catalog) { catalog.style.display = 'none'; catalog.setAttribute('aria-hidden', 'true'); }
+        const inv = document.getElementById('invEquipModal');
+        if (inv) { inv.style.display = 'none'; inv.setAttribute('aria-hidden', 'true'); }
         modalBackdropEl.style.display = 'none';
+    });
+}
+
+// Inventory/Equipment modal open/close wiring
+const invModal = document.getElementById('invEquipModal');
+const openInvBtn = document.getElementById('openInventoryBtn');
+const closeInvBtn = document.getElementById('closeInvEquipModal');
+if (openInvBtn && invModal) {
+    openInvBtn.addEventListener('click', () => {
+        updateInventory();
+        invModal.style.display = 'block';
+        invModal.setAttribute('aria-hidden', 'false');
+        if (modalBackdropEl) modalBackdropEl.style.display = 'block';
+    });
+}
+if (closeInvBtn && invModal) {
+    closeInvBtn.addEventListener('click', () => {
+        invModal.style.display = 'none';
+        invModal.setAttribute('aria-hidden', 'true');
+        if (modalBackdropEl) modalBackdropEl.style.display = 'none';
     });
 }
 

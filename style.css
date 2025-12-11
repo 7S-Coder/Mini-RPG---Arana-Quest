@@ -77,6 +77,12 @@ body{
 .item-tooltip{display:none;position:absolute;left:110%;top:0;min-width:200px;max-width:320px;background:linear-gradient(180deg,rgba(20,20,20,0.98),rgba(10,10,10,0.95));padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);box-shadow:0 8px 24px rgba(0,0,0,0.6);z-index:60;color:var(--muted);font-size:0.85rem}
 .inv-item:hover .item-tooltip, .shop-item:hover .item-tooltip, .catalog-item:hover .item-tooltip, .equip-slot:hover .item-tooltip{display:block}
 
+/* Tooltip for inventory items: show to the left to avoid overflowing modals */
+.inv-item .item-tooltip{left:auto;right:110%;top:0;z-index:1102}
+
+/* Ensure tooltips inside the modal don't overflow viewport badly */
+.modal .item-tooltip{max-width:46vw}
+
 /* For catalog entries show tooltip to the left to avoid going off-screen */
 .catalog-item .item-tooltip{left:auto;right:110%}
 /* For shop (right column) show tooltip to the left inside the window */
@@ -127,6 +133,40 @@ body{
 /* Modal/backdrop styles for shop and catalog */
 .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:900;display:none}
 .shop, #catalog{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:linear-gradient(180deg,var(--panel),#0b0b0b);padding:12px;border-radius:12px;box-shadow:0 12px 36px rgba(0,0,0,0.7);z-index:1000;max-width:95vw;width:92vw;max-height:90vh;overflow:auto;border:1px solid rgba(255,255,255,0.03)}
+
+/* Inventory/Equipment modal (large padding) */
+.modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:1001;display:none;width:min(960px,94vw);max-height:90vh;overflow:auto;border-radius:16px;background:linear-gradient(180deg,var(--panel),#0b0b0b);border:1px solid rgba(255,255,255,0.03);box-shadow:0 18px 48px rgba(0,0,0,0.75)}
+.modal .modal-content{padding:48px;box-sizing:border-box}
+.modal-close{position:absolute;right:18px;top:18px;background:transparent;border:0;color:var(--muted);font-size:1.1rem}
+.modal-columns{display:flex;flex-direction:column;gap:24px;margin-top:12px}
+.modal-column{flex:1}
+@media(min-width:800px){
+  .modal-columns{flex-direction:row;gap:32px}
+  .modal .modal-content{padding:64px}
+}
+
+/* Equipment figure layout */
+.equipment{position:relative;min-height:360px;display:block}
+.equipment-figure{width:320px;max-width:78%;margin:0 auto}
+.equipment-figure svg{display:block;width:100%;height:auto}
+.equipment-slots{position:absolute;inset:0;pointer-events:none}
+.equipment .equip-slot{position:absolute;pointer-events:auto;min-width:56px;min-height:56px;padding:6px;display:flex;align-items:center;justify-content:center}
+
+/* Positioning of individual slots around the humanoid (percent based) */
+.equipment .slot-chapeau{left:50%;top:3%;transform:translate(-50%,0)}
+.equipment .slot-arme{left:12%;top:40%;transform:translate(-50%,-50%)}
+.equipment .slot-botte{left:50%;bottom:6%;transform:translate(-50%,0)}
+.equipment .slot-plastron{left:50%;top:46%;transform:translate(-50%,-50%)}
+.equipment .slot-amulette{left:50%;top:30%;transform:translate(-50%,-50%)}
+.equipment .slot-anneau{left:75%;top:55%;transform:translate(-50%,-50%)}
+.equipment .slot-ceinture{left:50%;top:62%;transform:translate(-50%,-50%)}
+.equipment .slot-artefact{left:88%;top:20%;transform:translate(-50%,-50%)}
+
+/* Tweak visuals for absolute slots to match existing style */
+.equipment .equip-slot{border-radius:10px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.03);box-shadow:0 8px 20px rgba(0,0,0,0.5);}
+
+/* Familliers slot (bottom-left) */
+.equipment .slot-familliers{left:18%;bottom:10%;transform:translate(-50%,0)}
 
 /* On larger screens keep modals a bit narrower */
 @media(min-width:900px){
