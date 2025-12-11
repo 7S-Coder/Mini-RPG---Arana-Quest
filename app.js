@@ -716,6 +716,7 @@ function sellItem(index) {
     log(`💰 Vous vendez ${ITEMS[id]?.name ?? id} pour ${price} or.`);
     updateStats();
     savePlayer();
+    try { showTransactionMessage(`Vente: ${ITEMS[id]?.name ?? id} — ${price}g`, { type: 'sell', anchorId: 'inventory' }); } catch (e) {}
 }
 window.sellItem = sellItem;
 
@@ -766,6 +767,7 @@ if (shopEl) {
             player.inventory.push({ id: 'potion', name: ITEMS['potion'].name, rarity: 'common' });
             log(`🛒 Vous achetez une Potion pour ${cost} or.`);
             updateStats(); savePlayer();
+            try { showTransactionMessage(`Achat: Potion de soin — ${cost}g`, { type: 'buy', anchorId: 'shop' }); } catch (e) {}
             return;
         }
         const def = ITEMS[id];
@@ -776,6 +778,7 @@ if (shopEl) {
         player.inventory.push({ id: def.id, name: def.name, rarity: def.rarity });
         log(`🛒 Vous achetez ${def.name} pour ${cost} or.`);
         updateStats(); savePlayer();
+        try { showTransactionMessage(`Achat: ${def.name} — ${cost}g`, { type: 'buy', anchorId: 'shop' }); } catch (e) {}
     });
 }
 
@@ -1081,6 +1084,32 @@ function showPlayerDeath() {
         if (hp) { hp.classList.add('player-hit'); setTimeout(() => hp.classList.remove('player-hit'), 900); }
         setTimeout(() => panel.classList.remove('player-dead'), 900);
     } catch (e) { console.warn('showPlayerDeath', e); }
+}
+
+// --- Transaction message (purchase / sell) ---
+function showTransactionMessage(text, options = {}) {
+    try {
+        const type = options.type === 'sell' ? 'sell' : 'buy';
+        // choose anchor: prefer provided element id or shop panel, fallback to playerPanel
+        let anchor = null;
+        if (options.anchorId) anchor = document.getElementById(options.anchorId);
+        if (!anchor && type === 'buy') anchor = document.getElementById('shop') || document.getElementById('playerPanel');
+        if (!anchor) anchor = document.getElementById('playerPanel') || document.body;
+
+        // create float at top-left of anchor
+        const rect = anchor.getBoundingClientRect ? anchor.getBoundingClientRect() : { left: 0, top: 0 };
+        const el = document.createElement('div');
+        el.className = `tx-float ${type}`;
+        el.textContent = text;
+        // position relative to anchor: absolute within body using anchor coords
+        el.style.left = (rect.left + 12) + 'px';
+        el.style.top = (rect.top + 8) + 'px';
+        document.body.appendChild(el);
+        // remove after animation
+        el.addEventListener('animationend', () => { try { el.remove(); } catch(e){} });
+        // safety cleanup (slightly longer than animation to ensure visibility)
+        setTimeout(() => { if (el && el.parentNode) el.remove(); }, 3200);
+    } catch (e) { console.warn('showTransactionMessage', e); }
 }
 
 // --- Level up visuals ---

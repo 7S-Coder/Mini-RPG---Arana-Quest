@@ -309,6 +309,13 @@ body{
 .confetti-piece{position:fixed;width:8px;height:10px;border-radius:2px;z-index:2499;opacity:0;pointer-events:none}
 @keyframes confettiFall { 0% { transform:translateY(-10vh) rotate(0deg); opacity:1 } 100% { transform:translateY(80vh) rotate(720deg); opacity:0 } }
 
+/* Transaction float (purchase / sale) */
+.tx-float{position:absolute;left:12px;top:8px;background:linear-gradient(90deg,#fff7df,#ffe59a);color:#3b2b00;padding:8px 10px;border-radius:8px;font-weight:800;font-size:0.9rem;pointer-events:none;z-index:2200;opacity:0}
+.tx-float.buy{background:linear-gradient(90deg,#ffd36b,#ffc34d);}
+.tx-float.sell{background:linear-gradient(90deg,#cfe8ff,#9fd8ff);color:#081229}
+@keyframes txFloatUp { from { transform: translateY(0); opacity:1 } to { transform: translateY(-36px); opacity:0 } }
+.tx-float{animation: txFloatUp 2600ms cubic-bezier(.2,.8,.2,1) forwards}
+
 /* Hide log buttons on small screens: keep only the bottom mobile controls */
 @media(max-width:899px){
   #logPanel .log-controls{display:none !important}
