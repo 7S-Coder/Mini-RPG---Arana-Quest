@@ -49,18 +49,28 @@ const ITEMS = {
   mythos_core:  { id: 'mythos_core', name: 'Noyau de Mythos', rarity: 'mythic', dmg: 15, def: 8, cost: 1000 }
 };
 
+// Catalogue des objets pouvant être dropés en jeu (utilisez les clés correspondant à `ITEMS`)
+const DROPPABLE_ITEMS = [
+    'potion',
+    'iron_sword',
+    'dragon_blade',
+    'aegis_shield',
+    'mythos_core'
+];
+
 // Weighted random picker for items by rarity
 function pickRandomItem() {
-    // build weighted list of item keys according to rarity weights
+    // build weighted list using the droppable catalog and rarity weights
     const weighted = [];
-    Object.values(ITEMS).forEach(item => {
+    DROPPABLE_ITEMS.forEach(key => {
+        const item = ITEMS[key];
+        if (!item) return;
         const r = RARITIES[item.rarity] || { weight: 0 };
         const w = Math.max(0, r.weight || 0);
-        for (let i=0;i<w;i++) weighted.push(item);
+        for (let i = 0; i < w; i++) weighted.push(item);
     });
     if (!weighted.length) return null;
-    const pick = weighted[Math.floor(Math.random() * weighted.length)];
-    return pick;
+    return weighted[Math.floor(Math.random() * weighted.length)];
 }
 
 // Global use function so inline onclick can call it from the DOM
@@ -285,6 +295,41 @@ function updateInventory() {
     }).join(', ');
 }
 
+// Render the droppable items catalog into the #catalog panel
+function renderDroppableCatalog() {
+    const el = document.getElementById('catalog');
+    if (!el) return;
+    // build list of droppable items
+    const html = DROPPABLE_ITEMS.map(key => {
+        const it = ITEMS[key];
+        if (!it) return '';
+        const r = RARITIES[it.rarity] || { color: 'white' };
+        const glow = r.glow ? 'text-shadow:0 0 6px rgba(255,215,0,0.8);' : '';
+        const style = `color:${r.color};${glow}`;
+        return `<div class="catalog-item"><strong style="${style}">${it.name}</strong> — <em>${it.rarity}</em> ${it.heal ? `(+${it.heal} HP)` : ''}</div>`;
+    }).join('');
+    el.innerHTML = `<div class="catalog-head"><h3>Catalogue des drops</h3><button id="closeCatalog" class="btn">Fermer</button></div>${html}`;
+    // wire close button
+    const close = document.getElementById('closeCatalog');
+    if (close) close.addEventListener('click', () => toggleCatalog(false));
+}
+
+function toggleCatalog(show) {
+    const el = document.getElementById('catalog');
+    const btn = document.getElementById('openCatalogBtn');
+    if (!el || !btn) return;
+    const willShow = typeof show === 'boolean' ? show : (el.style.display === 'none');
+    el.style.display = willShow ? 'flex' : 'none';
+    el.setAttribute('aria-hidden', willShow ? 'false' : 'true');
+    // reflect state on button (optional)
+    btn.classList.toggle('active', willShow);
+    if (willShow) renderDroppableCatalog();
+}
+
+// hook catalog open button
+const catalogBtn = document.getElementById('openCatalogBtn');
+if (catalogBtn) catalogBtn.addEventListener('click', () => toggleCatalog());
+
 // load saved player if present (before first save in updateStats)
 let _hadSaved = false;
 try { _hadSaved = !!localStorage.getItem(STORAGE_KEY); } catch(e) { _hadSaved = false; }
@@ -301,6 +346,12 @@ function endCombatCleanup(reason) {
     if (shopEl) {
         shopEl.style.display = 'none';
         shopEl.setAttribute('aria-hidden', 'true');
+    }
+    // hide catalog if open
+    const catalogEl = document.getElementById('catalog');
+    if (catalogEl) {
+        catalogEl.style.display = 'none';
+        catalogEl.setAttribute('aria-hidden', 'true');
     }
 
     // clear enemy and enemy display
