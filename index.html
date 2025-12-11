@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini RPG - Arana Quest</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="playerPanel">
+        <h2>👤 Joueur</h2>
+        <p id="playerStats"></p>
+    </div>
+
+<button id="goToArena">Aller à l'arène</button>
+
+<div id="log"></div>
+
+<button id="attackBtn">Attaquer</button>
+<button id="runBtn">Fuir</button>
+
+<button id="openShop">Magasin</button>
+<div id="shop" style="display:none;">
+  <button data-item="sword">Acheter Épée (20 or)</button>
+  <button data-item="shield">Acheter Bouclier (15 or)</button>
+</div>
+
+<p id="inventory"></p>
+
+
+<script type="module" src="app.js"></script>
+    
+</body>
+</html>

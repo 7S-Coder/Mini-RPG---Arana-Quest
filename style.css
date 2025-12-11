@@ -1,0 +1,16 @@
+#playerPanel {
+  padding: 10px;
+  background: #222;
+  color: white;
+  width: 200px;
+  border-radius: 8px;
+}
+
+#log {
+  margin-top: 20px;
+  white-space: pre-line;
+  background: #eee;
+  padding: 10px;
+  height: 150px;
+  overflow-y: auto;
+}
