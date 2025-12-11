@@ -540,6 +540,33 @@ function pickRandomItem() {
     return weighted[Math.floor(Math.random() * weighted.length)];
 }
 
+// Decide and return a dropped item object for a defeated enemy (or null).
+// Special rule: mythic enemies have 75% chance to drop a mythic item.
+function decideDropForEnemy(enemy) {
+    try {
+        if (!enemy) return null;
+        // Mythic enemy special rule
+        if ((enemy.tier || '').toString() === 'mythic') {
+            if (Math.random() < 0.75) {
+                const mapId = enemy.originMap || currentMap;
+                return (pickMapItemByRarity(mapId, 'mythic') || pickItemByRarity('mythic') || pickRandomItem());
+            }
+            // 25% fallback to normal drop behaviour below
+        }
+        const totalDrop = sumObjectValues(RARITY_DROP_RATES);
+        if (Math.random() >= totalDrop) return null;
+        const r = Math.random() * totalDrop;
+        let acc = 0; let chosenRarity = null;
+        for (const [rk, rv] of Object.entries(RARITY_DROP_RATES)) {
+            acc += rv;
+            if (r <= acc) { chosenRarity = rk; break; }
+        }
+        if (!chosenRarity) chosenRarity = 'common';
+        const mapId = enemy.originMap || currentMap;
+        return (pickMapItemByRarity(mapId, chosenRarity) || pickItemByRarity(chosenRarity) || pickRandomItem());
+    } catch (e) { console.warn('decideDropForEnemy', e); return null; }
+}
+
 // Global use function so inline onclick can call it from the DOM
 function useItem(index) {
     const it = player.inventory[index];
@@ -989,28 +1016,15 @@ document.getElementById('attackBtn').addEventListener('click', () => {
             const goldGain = randInt(4, 14);
             log(`💀 ${target.name} vaincu ! Vous gagnez ${xpGain} XP et ${goldGain} or. (${tier} ×${rarityMult}, lvl ${target.level})`);
             player.xp += xpGain; player.gold += goldGain;
-            // decide drop by rarity probabilities
-            const totalDrop = sumObjectValues(RARITY_DROP_RATES);
-            if (Math.random() < totalDrop) {
-                const r = Math.random() * totalDrop;
-                let acc = 0;
-                let chosenRarity = null;
-                for (const [rk, rv] of Object.entries(RARITY_DROP_RATES)) {
-                    acc += rv;
-                    if (r <= acc) { chosenRarity = rk; break; }
-                }
-                if (!chosenRarity) chosenRarity = 'common';
-                // try map-specific loot first (enemy may carry originMap)
-                const mapId = target.originMap || currentMap;
-                const dropped = (pickMapItemByRarity(mapId, chosenRarity) || pickItemByRarity(chosenRarity) || pickRandomItem());
-                if (dropped) {
-                    player.inventory.push({ id: dropped.id, name: dropped.name, rarity: dropped.rarity });
-                    const rDef = RARITIES[dropped.rarity] || { color: 'white' };
-                    const glow = getGlowStyle(rDef, { type: 'text', size: 6 });
-                    const style = `color:${rDef.color};${glow}`;
-                    const itemHtml = `<span style="${style}">${dropped.name}</span> <em>(${dropped.rarity})</em>`;
-                    logHTML(`🎁 ${target.name} lâche : ${itemHtml}`);
-                }
+            // decide drop (centralized; mythic enemies have special chance)
+            const dropped = decideDropForEnemy(target);
+            if (dropped) {
+                player.inventory.push({ id: dropped.id, name: dropped.name, rarity: dropped.rarity });
+                const rDef = RARITIES[dropped.rarity] || { color: 'white' };
+                const glow = getGlowStyle(rDef, { type: 'text', size: 6 });
+                const style = `color:${rDef.color};${glow}`;
+                const itemHtml = `<span style="${style}">${dropped.name}</span> <em>(${dropped.rarity})</em>`;
+                logHTML(`🎁 ${target.name} lâche : ${itemHtml}`);
             }
             // remove dead enemy
             currentEnemies.splice(targetIndex, 1);
@@ -1036,28 +1050,15 @@ document.getElementById('attackBtn').addEventListener('click', () => {
         const goldGain = randInt(4, 14);
         log(`💀 ${target.name} vaincu ! Vous gagnez ${xpGain} XP et ${goldGain} or. (${tier} ×${rarityMult}, lvl ${target.level})`);
         player.xp += xpGain; player.gold += goldGain;
-        // decide drop by rarity probabilities
-        const totalDrop = sumObjectValues(RARITY_DROP_RATES);
-        if (Math.random() < totalDrop) {
-            const r = Math.random() * totalDrop;
-            let acc = 0;
-            let chosenRarity = null;
-            for (const [rk, rv] of Object.entries(RARITY_DROP_RATES)) {
-                acc += rv;
-                if (r <= acc) { chosenRarity = rk; break; }
-            }
-            if (!chosenRarity) chosenRarity = 'common';
-            // try map-specific loot first (enemy may carry originMap)
-            const mapId = target.originMap || currentMap;
-            const dropped = (pickMapItemByRarity(mapId, chosenRarity) || pickItemByRarity(chosenRarity) || pickRandomItem());
-            if (dropped) {
-                player.inventory.push({ id: dropped.id, name: dropped.name, rarity: dropped.rarity });
-                const rDef = RARITIES[dropped.rarity] || { color: 'white' };
-                const glow = getGlowStyle(rDef, { type: 'text', size: 6 });
-                const style = `color:${rDef.color};${glow}`;
-                const itemHtml = `<span style="${style}">${dropped.name}</span> <em>(${dropped.rarity})</em>`;
-                logHTML(`🎁 ${target.name} lâche : ${itemHtml}`);
-            }
+        // decide drop (centralized; mythic enemies have special chance)
+        const dropped = decideDropForEnemy(target);
+        if (dropped) {
+            player.inventory.push({ id: dropped.id, name: dropped.name, rarity: dropped.rarity });
+            const rDef = RARITIES[dropped.rarity] || { color: 'white' };
+            const glow = getGlowStyle(rDef, { type: 'text', size: 6 });
+            const style = `color:${rDef.color};${glow}`;
+            const itemHtml = `<span style="${style}">${dropped.name}</span> <em>(${dropped.rarity})</em>`;
+            logHTML(`🎁 ${target.name} lâche : ${itemHtml}`);
         }
         // remove dead enemy
         currentEnemies.splice(targetIndex, 1);
@@ -1088,23 +1089,11 @@ document.getElementById('attackBtn').addEventListener('click', () => {
             const goldGain2 = randInt(4, 14);
             log(`💀 ${target.name} vaincu ! Vous gagnez ${xpGain2} XP et ${goldGain2} or. (${tier2} ×${rarityMult2}, lvl ${target.level})`);
             player.xp += xpGain2; player.gold += goldGain2;
-            // decide drop by rarity probabilities
-            const totalDrop2 = sumObjectValues(RARITY_DROP_RATES);
-            if (Math.random() < totalDrop2) {
-                const r2 = Math.random() * totalDrop2;
-                let acc2 = 0;
-                let chosenRarity2 = null;
-                for (const [rk2, rv2] of Object.entries(RARITY_DROP_RATES)) {
-                    acc2 += rv2;
-                    if (r2 <= acc2) { chosenRarity2 = rk2; break; }
-                }
-                if (!chosenRarity2) chosenRarity2 = 'common';
-                const mapId2 = target.originMap || currentMap;
-                const dropped2 = (pickMapItemByRarity(mapId2, chosenRarity2) || pickItemByRarity(chosenRarity2) || pickRandomItem());
-                if (dropped2) {
-                    player.inventory.push({ id: dropped2.id, name: dropped2.name, rarity: dropped2.rarity });
-                    log(`🎁 ${target.name} lâche : ${dropped2.name} (${dropped2.rarity})`);
-                }
+            // decide drop (centralized; mythic enemies have special chance)
+            const dropped2 = decideDropForEnemy(target);
+            if (dropped2) {
+                player.inventory.push({ id: dropped2.id, name: dropped2.name, rarity: dropped2.rarity });
+                log(`🎁 ${target.name} lâche : ${dropped2.name} (${dropped2.rarity})`);
             }
             // remove dead enemy
             currentEnemies.splice(targetIndex, 1);
