@@ -120,8 +120,8 @@ const ITEMS = {
     void_relic:    { id: 'void_relic', name: 'Relique du Vide', rarity: 'mythic', type: 'artefact', bonus: 'void', cost: 2500 },
     celestial_crown:{ id: 'celestial_crown', name: 'Couronne Céleste', rarity: 'mythic', type: 'chapeau', bonus: 'divine', cost: 3000 },
     /* Familiers */
-    pet_dragon:   { id: 'pet_dragon', name: 'Dragon familier', rarity: 'epic', type: 'familliers', famAttack: 6, def: 2, cost: 800 },
-    pet_dog:      { id: 'pet_dog', name: 'Chien fidèle', rarity: 'rare', type: 'familliers', famAttack: 2, def: 1, cost: 120 }
+    pet_dragon:   { id: 'pet_dragon', name: 'Dragon familier', rarity: 'epic', type: 'familliers', famAttack: 25, famHp: 75, def: 30, dodge: 10, crit: 15, cost: 800 },
+    pet_dog:      { id: 'pet_dog', name: 'Chien fidèle', rarity: 'rare', type: 'familliers', famAttack: 8, famHp: 50, def: 10, dodge: 5, crit: 7, cost: 600 }
 
 };
 
@@ -610,6 +610,9 @@ function recalcStatsFromEquipment() {
     // reset familiar attack info
     player.familiarAttack = 0;
     player.familiarName = null;
+    // keep familiar HP between recalcs if possible
+    player.familiarMaxHp = player.familiarMaxHp || 0;
+    player.familiarHp = typeof player.familiarHp === 'number' ? player.familiarHp : 0;
     Object.values(player.equipment).forEach(eid => {
         if (!eid) return;
         const def = ITEMS[eid];
@@ -623,10 +626,31 @@ function recalcStatsFromEquipment() {
         if (def.famAttack) {
             player.familiarAttack += def.famAttack;
             if (!player.familiarName && def.name) player.familiarName = def.name;
+            // determine familiar HP (explicit famHp or hp on the item, or derive)
+            const famMax = (typeof def.famHp === 'number') ? def.famHp : (typeof def.hp === 'number' ? def.hp : Math.max(10, Math.round((def.famAttack || 1) * 6 + (def.def || 0) * 2)));
+            // if we equip a new familiar or max changed, set current HP to max
+            if (!player.familiarMaxHp || player.familiarMaxHp !== famMax) {
+                player.familiarMaxHp = famMax;
+                player.familiarHp = famMax;
+            } else {
+                // keep current hp but cap to new max
+                player.familiarMaxHp = famMax;
+                player.familiarHp = Math.min(player.familiarHp || famMax, famMax);
+            }
+            // familiar defensive stats
+            player.familiarDef = (typeof def.def === 'number' ? def.def : (typeof def.defense === 'number' ? def.defense : 0));
+            player.familiarDodge = (typeof def.dodge === 'number' ? def.dodge : 0);
+            player.familiarCrit = (typeof def.crit === 'number' ? def.crit : 0);
         }
     });
     // ensure current HP does not exceed max
     player.hp = Math.min(player.hp || player.maxHp, player.maxHp);
+    // if no familiar equipped, clear familiar hp values
+    if (!player.familiarAttack) {
+        player.familiarHp = 0;
+        player.familiarMaxHp = 0;
+        player.familiarName = null;
+    }
 }
 
 // Check and apply level ups if player has enough XP. Multiple levels possible.
@@ -707,6 +731,10 @@ function savePlayer() {
             // persist current location (map / dungeon)
             , currentMap: currentMap || null,
             currentDungeon: currentDungeon || null
+            , familiarHp: player.familiarHp || 0
+            , familiarMaxHp: player.familiarMaxHp || 0
+            , familiarName: player.familiarName || null
+            , familiarAttack: player.familiarAttack || 0
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     } catch (e) {
@@ -743,6 +771,13 @@ function loadPlayer() {
                 player.equipment[k] = data.equipment[k] ?? null;
             });
         }
+        // restore familiar fields
+        try {
+            player.familiarHp = typeof data.familiarHp === 'number' ? data.familiarHp : player.familiarHp;
+            player.familiarMaxHp = typeof data.familiarMaxHp === 'number' ? data.familiarMaxHp : player.familiarMaxHp;
+            player.familiarName = data.familiarName || player.familiarName;
+            player.familiarAttack = typeof data.familiarAttack === 'number' ? data.familiarAttack : player.familiarAttack;
+        } catch(e) { /* ignore */ }
         // restore current map / dungeon if saved
         try {
             if (data.currentMap) currentMap = data.currentMap;
@@ -797,6 +832,11 @@ function updateStats() {
         }
     } catch (e) { /* ignore UI location errors */ }
     const statsEl = document.getElementById('playerStats');
+    // include familiar status if present
+    if (player.familiarName && player.familiarMaxHp > 0) {
+        const fhp = player.familiarHp || 0;
+        s += `\nFamilier: ${player.familiarName} — PV ${fhp}/${player.familiarMaxHp} — ATK ${player.familiarAttack || 0}`;
+    }
     if (statsEl) statsEl.textContent = s;
     renderHPBar();
     renderXPBar();
@@ -1081,8 +1121,7 @@ document.getElementById('attackBtn').addEventListener('click', () => {
     const alive = currentEnemies.filter(e => e.hp > 0);
     if (alive.length > 0) {
         const attacker = alive[Math.floor(Math.random() * alive.length)];
-        // enemy attack: consider player's dodge
-        const attackerDmgBase = Math.max(0, attacker.damage - player.defense);
+        // enemy attack: consider player's dodge, and target familiar first if present
         const playerDodge = player.dodge || 0;
         if (playerDodge > 0 && Math.random() < (playerDodge/100)) {
             showDamageOnPlayer('Miss');
@@ -1091,10 +1130,27 @@ document.getElementById('attackBtn').addEventListener('click', () => {
             // enemy crit chance
             const attackerCrit = attacker.crit || 0;
             const isCrit = attackerCrit > 0 && Math.random() < (attackerCrit/100);
-            const attackerDmg = isCrit ? Math.max(1, Math.round(attackerDmgBase * 1.5)) : attackerDmgBase;
-            player.hp -= attackerDmg;
-            showDamageOnPlayer(isCrit ? `${attackerDmg} ⚡` : attackerDmg);
-            log(`🛡️ ${attacker.name} riposte et inflige ${attackerDmg} dégâts.${isCrit ? ' — COUP CRITIQUE !' : ''}`);
+            // if familiar exists and has HP, compute damage against familiar defenses
+            if (player.familiarHp && player.familiarHp > 0) {
+                const famDef = player.familiarDef || 0;
+                const base = Math.max(0, attacker.damage - famDef);
+                const attackerDmg = isCrit ? Math.max(1, Math.round(base * 1.5)) : base;
+                player.familiarHp -= attackerDmg;
+                showDamageOnFamiliar(isCrit ? `${attackerDmg} ⚡` : attackerDmg);
+                log(`🐾 ${attacker.name} attaque votre familier et inflige ${attackerDmg} dégâts.${isCrit ? ' — COUP CRITIQUE !' : ''}`);
+                if (player.familiarHp <= 0) {
+                    player.familiarHp = 0;
+                    // familier mort: disable its attack until revived/re-equipped
+                    player.familiarAttack = 0;
+                    log(`💀 ${player.familiarName || 'Votre familier'} est mort.`);
+                }
+            } else {
+                const base = Math.max(0, attacker.damage - player.defense);
+                const attackerDmg = isCrit ? Math.max(1, Math.round(base * 1.5)) : base;
+                player.hp -= attackerDmg;
+                showDamageOnPlayer(isCrit ? `${attackerDmg} ⚡` : attackerDmg);
+                log(`🛡️ ${attacker.name} riposte et inflige ${attackerDmg} dégâts.${isCrit ? ' — COUP CRITIQUE !' : ''}`);
+            }
         }
         if (player.hp <= 0) {
             showPlayerDeath();
@@ -1119,7 +1175,6 @@ document.getElementById('runBtn').addEventListener('click', () => {
         const alive = currentEnemies.filter(e => e.hp > 0);
         if (alive.length > 0) {
             const attacker = alive[Math.floor(Math.random() * alive.length)];
-            const attackerDmgBase = Math.max(0, attacker.damage - player.defense);
             const playerDodge = player.dodge || 0;
             if (playerDodge > 0 && Math.random() < (playerDodge/100)) {
                 showDamageOnPlayer('Miss');
@@ -1127,9 +1182,24 @@ document.getElementById('runBtn').addEventListener('click', () => {
             } else {
                 const attackerCrit = attacker.crit || 0;
                 const isCrit = attackerCrit > 0 && Math.random() < (attackerCrit/100);
-                const attackerDmg = isCrit ? Math.max(1, Math.round(attackerDmgBase * 1.5)) : attackerDmgBase;
-                player.hp -= attackerDmg;
-                showDamageOnPlayer(isCrit ? `${attackerDmg} ⚡` : attackerDmg);
+                if (player.familiarHp && player.familiarHp > 0) {
+                    const famDef = player.familiarDef || 0;
+                    const base = Math.max(0, attacker.damage - famDef);
+                    const attackerDmg = isCrit ? Math.max(1, Math.round(base * 1.5)) : base;
+                    player.familiarHp -= attackerDmg;
+                    showDamageOnFamiliar(isCrit ? `${attackerDmg} ⚡` : attackerDmg);
+                    log(`🐾 ${attacker.name} attaque votre familier et inflige ${attackerDmg} dégâts.${isCrit ? ' — COUP CRITIQUE !' : ''}`);
+                    if (player.familiarHp <= 0) {
+                        player.familiarHp = 0;
+                        player.familiarAttack = 0;
+                        log(`💀 ${player.familiarName || 'Votre familier'} est mort.`);
+                    }
+                } else {
+                    const base = Math.max(0, attacker.damage - player.defense);
+                    const attackerDmg = isCrit ? Math.max(1, Math.round(base * 1.5)) : base;
+                    player.hp -= attackerDmg;
+                    showDamageOnPlayer(isCrit ? `${attackerDmg} ⚡` : attackerDmg);
+                }
                 if (player.hp <= 0) {
                     showPlayerDeath();
                     player.hp = player.maxHp;
@@ -1987,6 +2057,28 @@ function showDamageOnPlayer(amount) {
         panel.appendChild(dmgEl);
         dmgEl.addEventListener('animationend', () => dmgEl.remove());
     } catch (e) { console.warn('showDamageOnPlayer', e); }
+}
+
+function showDamageOnFamiliar(amount) {
+    try {
+        const slot = document.querySelector('.equipment .slot-familliers');
+        if (slot) {
+            slot.classList.remove('player-hit');
+            void slot.offsetWidth;
+            slot.classList.add('player-hit');
+            setTimeout(() => slot.classList.remove('player-hit'), 600);
+            const dmgEl = document.createElement('div');
+            dmgEl.className = 'damage-float enemy-damage';
+            dmgEl.style.right = '6px';
+            dmgEl.style.top = '6px';
+            dmgEl.textContent = (typeof amount === 'number') ? `-${amount}` : `-${amount}`;
+            slot.appendChild(dmgEl);
+            dmgEl.addEventListener('animationend', () => dmgEl.remove());
+            return;
+        }
+        // fallback to log if no slot present
+        log(`🐾 Familier prend ${amount} dégâts.`);
+    } catch (e) { console.warn('showDamageOnFamiliar', e); }
 }
 
 function showEnemyKill(index) {
