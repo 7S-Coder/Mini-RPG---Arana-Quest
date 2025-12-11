@@ -10,7 +10,7 @@
 
 [ ITEMS & AMÉLIORATIONS ]
 [ ] - Power[ ] -ups ramassables
-[ ] - Items avec raretés (commun → mythique)
+[X] - Items avec raretés (commun → mythique)
 [ ] - Deep crafting (forge + améliorations)
 [ ] - Inventaire et équipement
 

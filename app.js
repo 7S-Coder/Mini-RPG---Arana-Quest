@@ -548,7 +548,11 @@ document.getElementById('attackBtn').addEventListener('click', () => {
             const dropped = pickItemByRarity(chosenRarity) || pickRandomItem();
             if (dropped) {
                 player.inventory.push({ id: dropped.id, name: dropped.name, rarity: dropped.rarity });
-                log(`🎁 ${target.name} lâche : ${dropped.name} (${dropped.rarity})`);
+                const rDef = RARITIES[dropped.rarity] || { color: 'white' };
+                const glow = getGlowStyle(rDef, { type: 'text', size: 6 });
+                const style = `color:${rDef.color};${glow}`;
+                const itemHtml = `<span style="${style}">${dropped.name}</span> <em>(${dropped.rarity})</em>`;
+                logHTML(`🎁 ${target.name} lâche : ${itemHtml}`);
             }
         }
         // remove dead enemy

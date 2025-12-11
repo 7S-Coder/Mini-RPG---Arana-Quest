@@ -79,6 +79,12 @@ body{
 
 /* Tooltip for inventory items: show to the left to avoid overflowing modals */
 .inv-item .item-tooltip{left:auto;right:110%;top:0;z-index:1102}
+.equip-slot .item-tooltip{left:auto;right:110%;top:0;z-index:5000;pointer-events:auto}
+.equip-slot:hover .item-tooltip{display:block}
+
+/* When equip slots are rendered inside a modal, show tooltip to the right (inside modal) */
+.modal .equip-slot .item-tooltip{left:110%;right:auto;top:0;z-index:1300;pointer-events:auto}
+.modal .equip-slot:hover .item-tooltip{display:block}
 
 /* Ensure tooltips inside the modal don't overflow viewport badly */
 .modal .item-tooltip{max-width:46vw}
@@ -149,7 +155,7 @@ body{
 .equipment{position:relative;min-height:360px;display:block}
 .equipment-figure{width:320px;max-width:78%;margin:0 auto}
 .equipment-figure svg{display:block;width:100%;height:auto}
-.equipment-slots{position:absolute;inset:0;pointer-events:none}
+.equipment-slots{position:absolute;inset:0;pointer-events:auto}
 .equipment .equip-slot{position:absolute;pointer-events:auto;min-width:56px;min-height:56px;padding:6px;display:flex;align-items:center;justify-content:center}
 
 /* Positioning of individual slots around the humanoid (percent based) */
